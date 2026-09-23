@@ -19,7 +19,7 @@
     <!-- 版本号：由 git tag（v1.2.3）经 MinVer 计算 -->
     <MinVerTagPrefix>v</MinVerTagPrefix>
     <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
-    <MinVerDefaultPreReleasePhase>preview</MinVerDefaultPreReleasePhase>
+    <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
 
     <!-- 包元数据 -->
     <Authors>Livia</Authors>

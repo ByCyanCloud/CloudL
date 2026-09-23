@@ -1,0 +1,20 @@
+# 统一换行符为 LF（与 .editorconfig 的 end_of_line = lf 保持一致）
+* text=auto eol=lf
+
+# 文本文件
+*.cs      text eol=lf
+*.csproj  text eol=lf
+*.props   text eol=lf
+*.targets text eol=lf
+*.slnx    text eol=lf
+*.json    text eol=lf
+*.config  text eol=lf
+*.md      text eol=lf
+
+# 二进制文件不做转换
+*.png    binary
+*.jpg    binary
+*.gif    binary
+*.ico    binary
+*.nupkg  binary
+*.snupkg binary
