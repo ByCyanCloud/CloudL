@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <AssemblyName>Livia.AspNetCore</AssemblyName>
+    <RootNamespace>Livia</RootNamespace>
+    <PackageId>Livia.AspNetCore</PackageId>
+    <Title>Livia AspNetCore</Title>
+    <Description>Livia DDD 框架 ASP.NET Core 集成：统一响应、全局异常与模型验证、JWT/CORS/Swagger、当前用户上下文、PBKDF2 密码哈希与 HTTP 客户端封装。</Description>
+    <PackageTags>ddd;aspnetcore;framework;livia</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Livia.Core\Livia.Core.csproj" />
+  </ItemGroup>
+
+</Project>
