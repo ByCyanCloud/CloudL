@@ -10,7 +10,10 @@
 dotnet restore
 dotnet build
 
-# 首次运行前执行数据库迁移（同时会写入角色种子数据）
+# 生成初始迁移（模板不预置迁移，迁移属于各业务项目）
+dotnet ef migrations add InitialCreate --project src/TemplateProject.EntityFrameworkCore
+
+# 应用迁移并写入角色种子数据
 dotnet run --project src/TemplateProject.DbMigrator
 
 # 启动 API（开发环境含 Swagger）
@@ -64,7 +67,7 @@ dotnet package update Livia.Core@0.1.0
 
 ```powershell
 dotnet ef migrations has-pending-model-changes --project src/TemplateProject.EntityFrameworkCore
-dotnet ef migrations add <Name> --project src/TemplateProject.EntityFrameworkCore --startup-project src/TemplateProject.Web
+dotnet ef migrations add <Name> --project src/TemplateProject.EntityFrameworkCore
 ```
 
 ### 生成时指定框架版本
@@ -107,9 +110,18 @@ dotnet nuget add source <框架仓库路径>/local-feed -n livia-local
 ## 数据库迁移
 
 ```powershell
-# 新增迁移（改完实体/配置后）
-dotnet ef migrations add <Name> --project src/TemplateProject.EntityFrameworkCore --startup-project src/TemplateProject.Web
+# 生成迁移（由 EF 项目内置的 DesignTimeDbContextFactory 提供连接串与提供程序）
+dotnet ef migrations add <Name> --project src/TemplateProject.EntityFrameworkCore
+
+# 查看待应用的迁移
+dotnet ef migrations list --project src/TemplateProject.EntityFrameworkCore
 
 # 应用迁移（或直接运行 DbMigrator）
 dotnet run --project src/TemplateProject.DbMigrator
 ```
+
+`TemplateProject.EntityFrameworkCore` 已引用 `Microsoft.EntityFrameworkCore.Design`（`PrivateAssets=all`），
+其内置的 `DesignTimeDbContextFactory` 会从 Web 项目读取 `appsettings.json`，因此**不依赖当前工作目录**。
+
+如需让 `dotnet ef` 通过 Web 主机的依赖注入来构造 `DbContext`，请给 Web 项目也加上
+`Microsoft.EntityFrameworkCore.Design`，并追加 `--startup-project src/TemplateProject.Web`。
