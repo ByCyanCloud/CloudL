@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Livia.Core/Livia.Core.csproj" />
+    <Project Path="src/Livia.EntityFrameworkCore/Livia.EntityFrameworkCore.csproj" />
+    <Project Path="src/Livia.AspNetCore/Livia.AspNetCore.csproj" />
+  </Folder>
+</Solution>

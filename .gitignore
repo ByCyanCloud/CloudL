@@ -1,0 +1,40 @@
+## 构建产物
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+*.binlog
+
+## 打包产物
+*.nupkg
+*.snupkg
+local-feed/
+packages/
+
+## IDE
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.DotSettings.user
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+## 测试与覆盖率
+TestResults/
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+
+## 操作系统
+.DS_Store
+Thumbs.db
+
+## 本地配置（含密钥，禁止提交）
+appsettings.Local.json
+*.env
