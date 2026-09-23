@@ -1,0 +1,33 @@
+## 构建产物
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+*.binlog
+
+## IDE
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.DotSettings.user
+
+## 测试与覆盖率
+TestResults/
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+
+## 本地配置（含密钥，禁止提交）
+appsettings.Local.json
+appsettings.Production.json
+*.env
+
+## 操作系统
+.DS_Store
+Thumbs.db

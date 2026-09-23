@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>TemplateProject.HttpApi</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Livia.Core" />
+    <PackageReference Include="Livia.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TemplateProject.Application.Contracts\TemplateProject.Application.Contracts.csproj" />
+    <ProjectReference Include="..\TemplateProject.Domain.Shared\TemplateProject.Domain.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

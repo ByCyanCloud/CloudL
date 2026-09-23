@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>TemplateProject.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Livia.Core" />
+    <PackageReference Include="Mapster" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TemplateProject.Domain\TemplateProject.Domain.csproj" />
+    <ProjectReference Include="..\TemplateProject.Application.Contracts\TemplateProject.Application.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

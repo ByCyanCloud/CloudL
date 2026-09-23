@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TemplateProject.Domain.Shared/TemplateProject.Domain.Shared.csproj" />
+    <Project Path="src/TemplateProject.Domain/TemplateProject.Domain.csproj" />
+    <Project Path="src/TemplateProject.Application.Contracts/TemplateProject.Application.Contracts.csproj" />
+    <Project Path="src/TemplateProject.Application/TemplateProject.Application.csproj" />
+    <Project Path="src/TemplateProject.Infrastructure/TemplateProject.Infrastructure.csproj" />
+    <Project Path="src/TemplateProject.EntityFrameworkCore/TemplateProject.EntityFrameworkCore.csproj" />
+    <Project Path="src/TemplateProject.HttpApi/TemplateProject.HttpApi.csproj" />
+    <Project Path="src/TemplateProject.Web/TemplateProject.Web.csproj" />
+    <Project Path="src/TemplateProject.DbMigrator/TemplateProject.DbMigrator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TemplateProject.Tests/TemplateProject.Tests.csproj" />
+  </Folder>
+</Solution>
