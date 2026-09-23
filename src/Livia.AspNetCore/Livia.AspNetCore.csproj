@@ -14,9 +14,12 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <!--
+    注意：Microsoft.Extensions.Http / Options / Configuration 等已包含在
+    Microsoft.AspNetCore.App 共享框架中，无需（也不应）再显式引用，否则会产生 NU1510。
+  -->
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
-    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 

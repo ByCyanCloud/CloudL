@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Http;
 
 namespace Livia.AspNetCore.HttpApi.Extensions;
 
@@ -9,6 +10,7 @@ public static class HttpRequestExtensions
 {
     /// <summary>
     /// 读取请求体文本（需先启用 <c>EnableBuffering</c>）。读取后流位置会复位，可反复读取。
+    /// 流不可定位（未启用缓冲）时返回空字符串。
     /// </summary>
     public static async Task<string> ReadBodyAsync(this HttpRequest request)
     {

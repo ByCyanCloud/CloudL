@@ -20,7 +20,7 @@ public abstract class BaseApiController : ControllerBase
         StatusCode(StatusCodes.Status201Created, ApiResponse<T>.Created(data, message));
 
     /// <summary>返回 204。</summary>
-    protected new IActionResult NoContentResponse() => NoContent();
+    protected IActionResult NoContentResponse() => NoContent();
 
     /// <summary>返回指定 HTTP 状态码与统一失败响应体。</summary>
     protected ActionResult<ApiResponse<T>> FailResponse<T>(
