@@ -15,7 +15,7 @@ public static class SnakeCaseQueryKey
 {
     /// <summary>
     /// 构建值提供器使用的字典：<strong>保留原始键</strong>（兼容既有 camelCase 调用方），
-    /// 并为含下划线的键追加 PascalCase 别名。
+    /// 并为 snake_case / 嵌套（含点）的键追加 PascalCase 别名。
     /// </summary>
     /// <remarks>
     /// 若同时传了 <c>page_index</c> 与 <c>pageIndex</c>，以 snake_case（约定写法）为准，
@@ -35,7 +35,7 @@ public static class SnakeCaseQueryKey
             values[pair.Key] = pair.Value;
         }
 
-        // 第二遍：为 snake_case 键追加 PascalCase 别名
+        // 第二遍：为 snake_case / 嵌套键追加 PascalCase 别名
         foreach (var pair in pairs)
         {
             var pascalCaseKey = ToPascalCase(pair.Key);
@@ -49,13 +49,16 @@ public static class SnakeCaseQueryKey
     }
 
     /// <summary>
-    /// 把 snake_case 键转换为 PascalCase：
+    /// 把 snake_case / 嵌套键转换为 PascalCase：
     /// <c>page_index</c> → <c>PageIndex</c>、<c>filter.sort_by</c> → <c>Filter.SortBy</c>。
-    /// 不含下划线时原样返回。
     /// </summary>
+    /// <remarks>
+    /// 只在需要改写时处理：含下划线（snake_case）或含点（嵌套模型）。
+    /// 纯粹的 camelCase / 单词键原样返回，避免改变既有语义。
+    /// </remarks>
     public static string ToPascalCase(string key)
     {
-        if (string.IsNullOrEmpty(key) || !key.Contains('_'))
+        if (string.IsNullOrEmpty(key) || (!key.Contains('_') && !key.Contains('.')))
             return key;
 
         var segments = key.Split('.');
@@ -67,9 +70,12 @@ public static class SnakeCaseQueryKey
         return string.Join('.', segments);
     }
 
+    /// <summary>
+    /// 转换单个段（不含点）：<c>page_index</c> → <c>PageIndex</c>、<c>filter</c> → <c>Filter</c>。
+    /// </summary>
     private static string ConvertSegment(string segment)
     {
-        if (!segment.Contains('_'))
+        if (segment.Length == 0)
             return segment;
 
         var parts = segment.Split('_', StringSplitOptions.RemoveEmptyEntries);
