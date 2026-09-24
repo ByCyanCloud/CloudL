@@ -5,8 +5,8 @@ namespace CloudL.UnitTests;
 
 /// <summary>
 /// snake_case query 参数绑定测试。
-/// 这块逻辑一旦失效，调用方按文档传 <c>?page_index=2</c> 会<strong>静默</strong>被忽略（拿到默认值而不报错），
-/// 所以必须有测试覆盖。
+/// <para>这块逻辑一旦失效，调用方按文档传 <c>?page_index=2</c> 会<strong>静默</strong>被忽略（拿到默认值而不报错），
+/// 或者 camelCase 被悄悄接受 —— 两者都很难排查，因此必须有测试覆盖。</para>
 /// </summary>
 public class SnakeCaseQueryBindingTests
 {
@@ -23,6 +23,23 @@ public class SnakeCaseQueryBindingTests
     [InlineData("", "")]
     public void ToPascalCase_ShouldConvertOnlySnakeCaseKeys(string input, string expected) =>
         Assert.Equal(expected, SnakeCaseQueryKey.ToPascalCase(input));
+
+    [Theory]
+    [InlineData("page_index", true)]
+    [InlineData("id", true)]
+    [InlineData("page2", true)]
+    [InlineData("filter.page_index", true)]
+    [InlineData("api-version", true)]
+    [InlineData("_t", true)]
+    [InlineData("pageIndex", false)]
+    [InlineData("PageIndex", false)]
+    [InlineData("ID", false)]
+    [InlineData("accessToken", false)]
+    [InlineData("page index", false)]
+    [InlineData("page/ index", false)]
+    [InlineData("", false)]
+    public void IsSnakeCase_ShouldRejectUpperCaseAndInvalidCharacters(string key, bool expected) =>
+        Assert.Equal(expected, SnakeCaseQueryKey.IsSnakeCase(key));
 
     [Fact]
     public void Build_ShouldExposeOnlyConvertedKeys()

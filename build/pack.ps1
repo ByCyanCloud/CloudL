@@ -64,6 +64,38 @@ if (-not (Test-Path $FeedPath)) {
 
 $FeedPath = (Resolve-Path $FeedPath).Path
 
+# ---------- 清理旧的预览包 ----------
+# local-feed 会随每次打包不断累积 0.1.1-preview.0.x，这里只保留稳定版与最新的一个预览版。
+$feedPackages = @(
+    Get-ChildItem -Path $FeedPath -Filter 'CloudL.*.nupkg' -File -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $FeedPath -Filter 'CloudL.*.snupkg' -File -ErrorAction SilentlyContinue
+)
+
+$versionedPackages = foreach ($package in $feedPackages) {
+    if ($package.Name -match '^CloudL\..+?\.(.+)\.(nupkg|snupkg)$') {
+        [pscustomobject]@{ Path = $package.FullName; Version = $Matches[1] }
+    }
+}
+
+$previewPackages = $versionedPackages | Where-Object { $_.Version -like '*preview*' }
+
+if ($previewPackages) {
+    $latestPreviewVersion = $previewPackages |
+        Group-Object Version |
+        Sort-Object { ($_.Group | Measure-Object -Property LastWriteTime -Maximum).Maximum } -Descending |
+        Select-Object -First 1 -ExpandProperty Name
+
+    $stalePackages = @($previewPackages | Where-Object { $_.Version -ne $latestPreviewVersion })
+
+    foreach ($stale in $stalePackages) {
+        Remove-Item -LiteralPath $stale.Path -Force -ErrorAction SilentlyContinue
+    }
+
+    if ($stalePackages.Count -gt 0) {
+        Write-Host "==> 已清理 $($stalePackages.Count) 个旧预览包（保留 $latestPreviewVersion）" -ForegroundColor Yellow
+    }
+}
+
 $projects = @(
     'src/CloudL.Core/CloudL.Core.csproj',
     'src/CloudL.EntityFrameworkCore/CloudL.EntityFrameworkCore.csproj',

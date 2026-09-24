@@ -74,12 +74,13 @@ dotnet package update CloudL.Core@0.1.0
 | 位置 | 约定 | 示例 |
 |---|---|---|
 | JSON 请求体 / 响应体 | snake_case | `{"user_name":"alice","row_version":"..."}` |
-| Query 参数 | snake_case（唯一约定） | `?page_index=2&page_size=50&sort_by=user_name` |
+| Query 参数 | snake_case（唯一约定，含大写字母的参数名返回 400） | `?page_index=2&page_size=50&sort_by=user_name` |
 | 验证错误键 | snake_case | `{"errors":{"page_index":["页码必须大于等于 1"]}}` |
 | Swagger 文档 | 与上一致（query 参数同样显示为 snake_case） | — |
 
 实现：`CloudLJson`（JSON）、`SnakeCaseQueryValueProviderFactory`（query 绑定）、
 `SnakeCaseQueryParameterOperationFilter`（Swagger），由 `AddCloudLAspNetCore` 自动接入。
 
-> 说明：框架不再为 camelCase 提供转换通道，但 ASP.NET Core 的模型绑定与值查找本身是**大小写不敏感**的，
-> 因此 `?pageIndex=2` 这类写法仍会被绑定。若需要明确拒绝（返回 400），需额外做 query 参数白名单校验。
+> 说明：`QueryParameterNamingFilter` 会校验 query 参数名 —— **含大写字母（camelCase / PascalCase）时直接返回 400**，
+> 并在响应中列出不合法的参数名；键允许的字符为小写字母、数字、下划线、点（嵌套分隔）与连字符。
+> 这样做是为了避免"参数名不匹配 → 静默使用默认值 → 调用方拿到错误结果却没有任何提示"。

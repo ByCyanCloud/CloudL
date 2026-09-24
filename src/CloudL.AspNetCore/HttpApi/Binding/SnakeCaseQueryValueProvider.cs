@@ -9,7 +9,8 @@ namespace CloudL.AspNetCore.HttpApi.Binding;
 /// <summary>
 /// query 参数键的映射工具：把 snake_case 键映射为模型绑定可识别的 PascalCase 键。
 /// <para>约定：query 使用 snake_case（<c>?page_index=2&amp;sort_by=user_name</c>），
-/// 与 JSON 请求/响应体、验证错误键保持一致；<strong>不为 camelCase 提供转换通道</strong>。</para>
+/// 与 JSON 请求/响应体、验证错误键保持一致；<strong>不为 camelCase 提供转换通道</strong>，
+/// 含大写字母的参数名由 <c>QueryParameterNamingFilter</c> 直接拒绝（HTTP 400）。</para>
 /// </summary>
 public static class SnakeCaseQueryKey
 {
@@ -54,6 +55,33 @@ public static class SnakeCaseQueryKey
         }
 
         return string.Join('.', segments);
+    }
+
+    /// <summary>
+    /// 判断 query 参数名是否符合约定。
+    /// <para>允许：小写字母、数字、下划线、点（嵌套分隔）、连字符；且<strong>不得含大写字母</strong>。</para>
+    /// <para>因此 <c>page_index</c>、<c>id</c>、<c>filter.page_index</c>、<c>api-version</c> 合法，
+    /// 而 <c>pageIndex</c>、<c>PageIndex</c>、<c>ID</c> 不合法。</para>
+    /// </summary>
+    public static bool IsSnakeCase(string key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return false;
+
+        foreach (var character in key)
+        {
+            if (char.IsAsciiLetterUpper(character))
+                return false;
+
+            if (!char.IsAsciiLetterLower(character)
+                && !char.IsAsciiDigit(character)
+                && character is not ('_' or '.' or '-'))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

@@ -4,6 +4,7 @@ using System.Text;
 using CloudL.AspNetCore.Configuration;
 using CloudL.AspNetCore.HttpApi.Binding;
 using CloudL.AspNetCore.HttpApi.Extensions;
+using CloudL.AspNetCore.HttpApi.Filters;
 using CloudL.AspNetCore.HttpApi.Swagger;
 using CloudL.AspNetCore.Infrastructure.Services;
 using CloudL.AspNetCore.Json;
@@ -74,8 +75,12 @@ public static class ServiceCollectionExtensions
 
         // query 参数同样采用 snake_case（与 JSON 请求/响应体、验证错误键保持一致）；
         // 同时保留 camelCase 写法，避免破坏既有调用方。
+        // query 参数：键名统一走 snake_case；含大写字母的参数名由 QueryParameterNamingFilter 直接拒绝
         services.Configure<MvcOptions>(options =>
-            options.ValueProviderFactories.Insert(0, new SnakeCaseQueryValueProviderFactory()));
+        {
+            options.ValueProviderFactories.Insert(0, new SnakeCaseQueryValueProviderFactory());
+            options.Filters.Add<QueryParameterNamingFilter>();
+        });
 
         return services;
     }
