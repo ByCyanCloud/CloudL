@@ -24,6 +24,31 @@ public class SensitiveDataRedactorTests
         Assert.Contains("\"refreshToken\":\"***\"", redacted);
     }
 
+    [Theory]
+    [InlineData("access_token", true)]
+    [InlineData("refresh_token", true)]
+    [InlineData("client_secret", true)]
+    [InlineData("api-key", true)]
+    [InlineData("AccessToken", true)]
+    [InlineData("page_index", false)]
+    [InlineData("user_name", false)]
+    [InlineData("note", false)]
+    public void IsSensitiveKey_ShouldIgnoreSeparatorsAndCase(string key, bool expected) =>
+        Assert.Equal(expected, SensitiveDataRedactor.IsSensitiveKey(key));
+
+    [Fact]
+    public void RedactBody_ShouldMaskSensitiveKeysWrittenWithSeparators()
+    {
+        const string body = """
+            {"access_token":"secret-value","client_secret":"another-secret"}
+            """;
+
+        var redacted = SensitiveDataRedactor.RedactBody(body);
+
+        Assert.DoesNotContain("secret-value", redacted);
+        Assert.DoesNotContain("another-secret", redacted);
+    }
+
     [Fact]
     public void RedactBody_ShouldKeepNonSensitiveFields()
     {
@@ -105,6 +130,34 @@ public class SensitiveDataRedactorTests
     {
         Assert.Equal(string.Empty, SensitiveDataRedactor.RedactBody(null));
         Assert.Equal(string.Empty, SensitiveDataRedactor.RedactBody("   "));
+    }
+
+    [Fact]
+    public void RedactQueryString_ShouldMaskSensitiveValuesOnly()
+    {
+        var redacted = SensitiveDataRedactor.RedactQueryString("?page_index=2&access_token=abc123&sort_by=user_name");
+
+        Assert.Contains("page_index=2", redacted);
+        Assert.Contains("sort_by=user_name", redacted);
+        Assert.Contains("access_token=***", redacted);
+        Assert.DoesNotContain("abc123", redacted);
+    }
+
+    [Fact]
+    public void RedactQueryString_ShouldMaskSecretShapedValuesUnderInnocentKeys()
+    {
+        var redacted = SensitiveDataRedactor.RedactQueryString("?ticket=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig");
+
+        Assert.DoesNotContain("eyJhbGciOiJIUzI1NiJ9", redacted);
+    }
+
+    [Fact]
+    public void RedactQueryString_ShouldHandleEdgeCases()
+    {
+        Assert.Equal(string.Empty, SensitiveDataRedactor.RedactQueryString(null));
+        Assert.Equal(string.Empty, SensitiveDataRedactor.RedactQueryString("?"));
+        Assert.Equal("?flag", SensitiveDataRedactor.RedactQueryString("?flag"));
+        Assert.Equal("page_index=2", SensitiveDataRedactor.RedactQueryString("page_index=2"));
     }
 
     [Fact]

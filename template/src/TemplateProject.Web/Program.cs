@@ -81,6 +81,9 @@ app.Use(async (context, next) =>
     await next(context);
 });
 
+// 请求日志：每个请求一条摘要（query 中的敏感参数自动脱敏）；/health、/swagger 降级为 Verbose
+app.UseCloudLRequestLogging();
+
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())

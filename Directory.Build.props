@@ -42,6 +42,12 @@
     <NuGetAuditLevel>low</NuGetAuditLevel>
 
     <!--
+      框架代码零警告：警告即错误（NuGet 审计类警告除外，避免审计源不可用时阻断构建）。
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904;NU1905</WarningsNotAsErrors>
+
+    <!--
       Release 构建启用 CI 语义：SDK 会自动做路径映射，
       避免符号包（.snupkg）里的 PDB 泄露本机绝对路径与用户名。
     -->

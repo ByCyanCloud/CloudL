@@ -17,8 +17,6 @@ public static class AppConstants
     /// <summary>最大分页大小。</summary>
     public const int MaxPageSize = 100;
 
-    /// <summary>GetAllAsync 的安全上限，防止误加载全表。</summary>
-    public const int MaxGetAllCount = 1000;
 
     /// <summary>批量创建的最大条数。</summary>
     public const int MaxBatchCreateCount = 100;

@@ -15,10 +15,6 @@ public interface IRepository<TEntity, TKey>
     /// <summary>根据主键获取实体（跟踪查询）。</summary>
     Task<TEntity?> GetByIdAsync(TKey id, CancellationToken cancellationToken = default);
 
-    /// <summary>获取全部实体（已限制最大条数）。</summary>
-    [Obsolete("请使用 GetPagedAsync 分页查询，避免一次性加载全表数据。")]
-    Task<IReadOnlyList<TEntity>> GetAllAsync(CancellationToken cancellationToken = default);
-
     /// <summary>按条件查询（无跟踪）。</summary>
     Task<IReadOnlyList<TEntity>> FindAsync(
         Expression<Func<TEntity, bool>> predicate,

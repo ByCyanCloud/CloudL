@@ -85,3 +85,12 @@ dotnet package update CloudL.Core@0.1.0
 > 说明：`QueryParameterNamingFilter` 会校验 query 参数名 —— **含大写字母（camelCase / PascalCase）时直接返回 400**，
 > 并在响应中列出不合法的参数名；键允许的字符为小写字母、数字、下划线、点（嵌套分隔）与连字符。
 > 这样做是为了避免"参数名不匹配 → 静默使用默认值 → 调用方拿到错误结果却没有任何提示"。
+
+## 日志约定
+
+- **请求日志**：`app.UseCloudLRequestLogging()` —— 每个请求一条摘要（方法、路径、状态码、耗时、TraceId、客户端 IP、用户名）。
+  query string 中的敏感参数（如 `access_token`）会自动遮蔽；`/health`、`/swagger`、`/favicon.ico` 降级为 Verbose。
+- **异常与验证失败**：由 `ExceptionHandlingMiddleware` 与 `ValidationFilter` 输出，请求体与 Authorization 头经脱敏，
+  块状日志以空行开头，便于在日志文件中区分不同日志段。
+- **脱敏两层策略**：按键名（忽略大小写与 `_`/`-`，因此 `access_token`、`api-key`、`client_secret` 均命中）
+  与按值的形态（JWT、≥40 位不透明令牌），键名起成 `ticket` 也遮得住。

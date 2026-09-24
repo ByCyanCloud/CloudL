@@ -34,15 +34,6 @@ public class EfCoreRepository<TEntity, TKey> : IRepository<TEntity, TKey>
         => await DbSet.FindAsync([id], cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
-    [Obsolete("请使用 GetPagedAsync 分页查询，避免一次性加载全表数据。")]
-    public virtual async Task<IReadOnlyList<TEntity>> GetAllAsync(CancellationToken cancellationToken = default)
-        => await DbSet.AsNoTracking()
-            .OrderByDescending(entity => entity.CreatedAt)
-            .Take(AppConstants.MaxGetAllCount)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-    /// <inheritdoc />
     public virtual async Task<IReadOnlyList<TEntity>> FindAsync(
         Expression<Func<TEntity, bool>> predicate,
         CancellationToken cancellationToken = default)

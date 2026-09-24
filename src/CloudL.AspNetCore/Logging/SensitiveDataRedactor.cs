@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -9,7 +10,8 @@ namespace CloudL.AspNetCore.Logging;
 /// 日志脱敏工具。
 /// 采用<strong>两层</strong>策略，避免"改了个字段名就漏"的问题：
 /// <list type="number">
-///   <item>按键名遮蔽：<c>password</c>、<c>refreshToken</c>、<c>clientSecret</c> 等常见敏感字段；</item>
+///   <item>按键名遮蔽：<c>password</c>、<c>refreshToken</c>、<c>client_secret</c>、<c>access_token</c> 等常见敏感字段
+///         （比较时会忽略下划线与连字符，因此 <c>access_token</c>、<c>api-key</c> 同样命中）；</item>
 ///   <item>按值的形态遮蔽：JWT 形状的字符串、以及长串不透明令牌（≥40 位 base64/hex 风格字符），
 ///         即使键名起成 <c>pwd</c>、<c>pin</c>、<c>ticket</c> 也会被遮住。</item>
 /// </list>
@@ -20,13 +22,7 @@ public static class SensitiveDataRedactor
     private const string Mask = "***";
     private const int MaxBodyLength = 4096;
 
-    /// <summary>序列化脱敏结果时保留中文可读性（默认编码器会把中文转义成 Unicode 转义序列）。</summary>
-    private static readonly JsonSerializerOptions RedactedJsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    };
-
-    /// <summary>按名遮蔽的字段名（大小写不敏感）。</summary>
+    /// <summary>按名遮蔽的字段名（大小写不敏感；比较前会去掉下划线与连字符）。</summary>
     private static readonly HashSet<string> SensitiveKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         "password",
@@ -59,6 +55,54 @@ public static class SensitiveDataRedactor
     private static readonly Regex OpaqueTokenPattern = new(
         @"^[A-Za-z0-9_\-+/=]{40,}$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>判断某个字段名是否需要遮蔽（忽略大小写、下划线与连字符）。</summary>
+    public static bool IsSensitiveKey(string? key) =>
+        !string.IsNullOrEmpty(key) && SensitiveKeys.Contains(NormalizeKey(key));
+
+    /// <summary>
+    /// 脱敏 query string：保留参数名与普通参数值，遮蔽敏感参数的值。
+    /// <para>用于请求日志 —— 否则 <c>?access_token=...</c> 这类令牌会随日志落盘。</para>
+    /// </summary>
+    public static string RedactQueryString(string? queryString)
+    {
+        if (string.IsNullOrWhiteSpace(queryString))
+            return string.Empty;
+
+        var hasPrefix = queryString.StartsWith('?');
+        var raw = hasPrefix ? queryString[1..] : queryString;
+
+        if (raw.Length == 0)
+            return string.Empty;
+
+        var builder = new StringBuilder(raw.Length);
+
+        foreach (var pair in raw.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (builder.Length > 0)
+                builder.Append('&');
+
+            var separatorIndex = pair.IndexOf('=');
+            if (separatorIndex <= 0)
+            {
+                builder.Append(pair);
+                continue;
+            }
+
+            var key = pair[..separatorIndex];
+            var value = pair[(separatorIndex + 1)..];
+
+            builder.Append(key)
+                .Append('=')
+                .Append(IsSensitiveKey(key) || LooksLikeSecret(Uri.UnescapeDataString(value)) ? Mask : value);
+        }
+
+        var result = builder.ToString();
+        if (result.Length == 0)
+            return string.Empty;
+
+        return hasPrefix ? "?" + result : result;
+    }
 
     /// <summary>
     /// 脱敏请求体。
@@ -114,6 +158,10 @@ public static class SensitiveDataRedactor
         return $"{parts[0]} ***{tail}";
     }
 
+    private static string NormalizeKey(string key) =>
+        key.Replace("_", string.Empty, StringComparison.Ordinal)
+            .Replace("-", string.Empty, StringComparison.Ordinal);
+
     private static void RedactNode(JsonNode node)
     {
         switch (node)
@@ -121,7 +169,7 @@ public static class SensitiveDataRedactor
             case JsonObject jsonObject:
                 foreach (var property in jsonObject.ToList())
                 {
-                    if (SensitiveKeys.Contains(property.Key))
+                    if (IsSensitiveKey(property.Key))
                     {
                         jsonObject[property.Key] = Mask;
                         continue;
@@ -175,4 +223,10 @@ public static class SensitiveDataRedactor
 
         return JwtPattern.IsMatch(value) || OpaqueTokenPattern.IsMatch(value);
     }
+
+    /// <summary>序列化脱敏结果时保留中文可读性（默认编码器会把中文转义成 Unicode 转义序列）。</summary>
+    private static readonly JsonSerializerOptions RedactedJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 }
