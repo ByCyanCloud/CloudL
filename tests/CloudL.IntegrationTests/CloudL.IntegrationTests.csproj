@@ -14,11 +14,13 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CloudL.AspNetCore\CloudL.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\CloudL.Core\CloudL.Core.csproj" />
+    <ProjectReference Include="..\..\src\CloudL.EntityFrameworkCore\CloudL.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
 </Project>

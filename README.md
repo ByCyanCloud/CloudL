@@ -130,3 +130,26 @@ dotnet package update CloudL.Core@0.1.0
 - 只有框架定义的业务异常会把异常消息透传给调用方；其余异常统一返回「服务器内部错误」并附带 `error_id`（便于对照日志排查）。
 - 日志级别由映射出的状态码决定：5xx 记 Error（含堆栈），4xx 记 Warning —— 规则只有一处，不会随时间跑偏。
 - 开发环境下 5xx 响应会附带 `error_detail`（堆栈）；生产环境不返回。请求体与 Authorization 头在写日志前一律脱敏。
+
+## 事务
+
+把多次写入包进一个事务：
+
+```csharp
+await _unitOfWork.ExecuteInTransactionAsync(async ct =>
+{
+    orderRepository.Add(order);
+    await _unitOfWork.SaveChangesAsync(ct);
+
+    inventoryRepository.Update(item);
+    await _unitOfWork.SaveChangesAsync(ct);
+}, cancellationToken);
+```
+
+- 任一步抛异常 → 整体回滚，并且**领域事件也不会分发** —— 不会出现"通知已经发出去、数据却没落库"的幽灵事件。
+- 嵌套调用复用最外层事务，由最外层决定提交或回滚。
+- 操作结束后会自动 `SaveChanges` 收尾，最后一步不必手动提交。
+- 兼容 `EnableRetryOnFailure`：内部通过执行策略（ExecutionStrategy）执行，手动事务不会与重试冲突。
+- **代价（务必知晓）**：领域事件处理器在**事务提交之后**运行，因此处理器里的写操作属于新事务，不随主事务回滚。
+  需要与主事务同生共死的工作，请直接写在主操作里，而不是放进事件处理器。
+- 需要跨进程最终一致（发消息、发通知）时，仍建议在业务侧引入 Outbox 模式。

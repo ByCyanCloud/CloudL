@@ -21,6 +21,9 @@ namespace CloudL.EntityFrameworkCore;
 /// <remarks>
 /// 关于领域事件的一致性：事件在 <c>SaveChanges</c> <strong>提交成功之后</strong>分发。
 /// 此时数据已落库，若处理器抛异常，调用方会收到失败响应但数据已提交。
+/// <para>若处于事务延迟范围（由 <c>IUnitOfWork.ExecuteInTransactionAsync</c> 开启），
+/// 事件会先攒起来，等<strong>事务提交后</strong>再统一分发；事务回滚则直接丢弃 ——
+/// 因此不会出现"通知已经发出去、数据却没落库"的幽灵事件。</para>
 /// 对强一致性有要求的场景，请在业务侧引入 Outbox 模式，或覆写
 /// <see cref="DispatchDomainEventsAsync"/> 改变分发时机。
 /// </remarks>
@@ -28,6 +31,12 @@ public abstract class FrameworkDbContext : DbContext
 {
     private readonly IDomainEventDispatcher? _domainEventDispatcher;
     private readonly ICurrentUser? _currentUser;
+
+    /// <summary>事务范围内延迟分发的领域事件。</summary>
+    private readonly List<IDomainEvent> _deferredDomainEvents = [];
+
+    /// <summary>领域事件延迟深度（支持嵌套）。</summary>
+    private int _domainEventDeferralDepth;
 
     protected FrameworkDbContext(
         DbContextOptions options,
@@ -80,6 +89,32 @@ public abstract class FrameworkDbContext : DbContext
         await _domainEventDispatcher.DispatchAsync(domainEvents, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// 开启领域事件延迟：范围内的 <c>SaveChanges</c> 只收集事件，直到
+    /// <see cref="FlushDeferredDomainEventsAsync"/> 才真正分发。
+    /// 由 <c>EfCoreUnitOfWork.ExecuteInTransactionAsync</c> 使用。
+    /// </summary>
+    internal IDisposable BeginDomainEventDeferral()
+    {
+        _domainEventDeferralDepth++;
+        return new DomainEventDeferral(this);
+    }
+
+    /// <summary>分发并清空延迟的领域事件（事务提交后调用）。</summary>
+    internal async Task FlushDeferredDomainEventsAsync(CancellationToken cancellationToken)
+    {
+        if (_deferredDomainEvents.Count == 0)
+            return;
+
+        var events = _deferredDomainEvents.ToArray();
+        _deferredDomainEvents.Clear();
+
+        await DispatchDomainEventsAsync(events, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>丢弃延迟的领域事件（事务回滚时调用）。</summary>
+    internal void DiscardDeferredDomainEvents() => _deferredDomainEvents.Clear();
+
     private async Task<int> SaveChangesCoreAsync(
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken)
@@ -109,8 +144,15 @@ public abstract class FrameworkDbContext : DbContext
             ClearDomainEvents();
         }
 
-        // 4. 提交成功后再分发领域事件
-        await DispatchDomainEventsAsync(domainEvents, cancellationToken).ConfigureAwait(false);
+        // 4. 提交成功后再分发；若处在事务延迟范围内，则先攒起来等事务提交
+        if (_domainEventDeferralDepth > 0)
+        {
+            _deferredDomainEvents.AddRange(domainEvents);
+        }
+        else
+        {
+            await DispatchDomainEventsAsync(domainEvents, cancellationToken).ConfigureAwait(false);
+        }
 
         return affectedRows;
     }
@@ -170,6 +212,24 @@ public abstract class FrameworkDbContext : DbContext
             {
                 property.SetIsUnicode(true);
             }
+        }
+    }
+
+    /// <summary>领域事件延迟范围：释放时递减深度，重复释放无副作用。</summary>
+    private sealed class DomainEventDeferral : IDisposable
+    {
+        private readonly FrameworkDbContext _dbContext;
+        private bool _disposed;
+
+        public DomainEventDeferral(FrameworkDbContext dbContext) => _dbContext = dbContext;
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            _dbContext._domainEventDeferralDepth--;
         }
     }
 }
