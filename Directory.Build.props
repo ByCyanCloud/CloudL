@@ -21,13 +21,17 @@
     <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
     <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
 
-    <!-- 包元数据 -->
-    <Authors>CloudL</Authors>
-    <Company>CloudL</Company>
+    <!-- 包元数据（发布后不可修改，改动需发新版本号） -->
+    <Authors>ByCyanCloud</Authors>
+    <Company>ByCyanCloud</Company>
     <Product>CloudL</Product>
+    <Copyright>Copyright (c) 2026 ByCyanCloud</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/ByCyanCloud/CloudL</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ByCyanCloud/CloudL</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>
@@ -38,6 +42,11 @@
 
   <ItemGroup>
     <PackageReference Include="MinVer" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- 把仓库 README 打进包，供 nuget.org 渲染包页面（不打包的项目会忽略该项） -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)README.md')">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
 </Project>
