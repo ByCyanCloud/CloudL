@@ -53,6 +53,15 @@
     -->
     <ContinuousIntegrationBuild Condition="'$(Configuration)' == 'Release'">true</ContinuousIntegrationBuild>
 
+    <!--
+      包校验（底层是 ApiCompat）：打包时与上一个已发布版本比对公开 API 面，
+      出现破坏性变更即失败。目的不是"禁止破坏"，而是让每一次破坏都必须是有意识的 ——
+      有意的破坏请登记到 ApiCompatSuppressionFile 指向的抑制文件里，那份文件就是机器可读的迁移清单。
+      每次发布后更新基线版本。
+    -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.1.0</PackageValidationBaselineVersion>
+
     <!-- 默认不打包：仅 src/ 下的框架项目显式打开 IsPackable -->
     <IsPackable>false</IsPackable>
   </PropertyGroup>

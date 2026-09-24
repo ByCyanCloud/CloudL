@@ -153,3 +153,20 @@ await _unitOfWork.ExecuteInTransactionAsync(async ct =>
 - **代价（务必知晓）**：领域事件处理器在**事务提交之后**运行，因此处理器里的写操作属于新事务，不随主事务回滚。
   需要与主事务同生共死的工作，请直接写在主操作里，而不是放进事件处理器。
 - 需要跨进程最终一致（发消息、发通知）时，仍建议在业务侧引入 Outbox 模式。
+
+## 公开 API 兼容性守卫
+
+打包时会自动与**上一个已发布版本**比对公开 API 面（底层是 ApiCompat），出现破坏性变更即失败：
+
+```xml
+<EnablePackageValidation>true</EnablePackageValidation>
+<PackageValidationBaselineVersion>0.1.0</PackageValidationBaselineVersion>
+```
+
+- 目的不是"禁止破坏"，而是**让每一次破坏都必须是有意识的**：手滑删掉一个 public 成员会直接让打包失败。
+- 有意的破坏 → 登记到 `src/<项目>/CompatibilitySuppressions.xml`（工具生成，也可手写注释说明理由）。
+  那份文件同时就是**机器可读的迁移清单**，应与 CHANGELOG 的「迁移影响」互相印证。
+- 重新生成抑制文件：`dotnet pack <项目> -c Release /p:ApiCompatGenerateSuppressionFile=true`。
+- **每次发布后要更新基线版本**，否则新版本的破坏又会去和旧基线比对。
+- 它管不到**行为变更**（例如 camelCase 参数开始返回 400、响应字典键不再改写、异常映射收敛）——
+  那类变更靠 CHANGELOG 的迁移影响说明与集成测试来兜。

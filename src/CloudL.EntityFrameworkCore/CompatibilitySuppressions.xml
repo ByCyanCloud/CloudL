@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids -->
+<!--
+  这里登记的是「有意为之」的公开 API 破坏性变更，由包校验（ApiCompat）机器校验。
+  也就是说：任何 API 破坏要么在这里显式登记，要么就让打包失败。
+
+  0.2.0 相对基线 0.1.0 的破坏性变更（详见 CHANGELOG.md 的「0.2.0 · 迁移影响」）：
+    · CP0002  EfCoreRepository<TEntity, TKey>.GetAllAsync 已删除
+              —— 与 IRepository 上的同名方法一起移除（它会静默截断到 1000 行，属陷阱 API）
+
+  重新生成：dotnet pack <项目> -c Release /p:ApiCompatGenerateSuppressionFile=true
+  注意：重新生成会覆盖本注释，更新基线后请把说明补回来。
+-->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:CloudL.EntityFrameworkCore.Repositories.EfCoreRepository`2.GetAllAsync(System.Threading.CancellationToken)</Target>
+    <Left>lib/net10.0/CloudL.EntityFrameworkCore.dll</Left>
+    <Right>lib/net10.0/CloudL.EntityFrameworkCore.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>
