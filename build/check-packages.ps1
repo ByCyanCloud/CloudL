@@ -9,6 +9,10 @@
 
         pwsh ./build/check-packages.ps1
 
+    规则设计原则：只匹配<strong>真凭据形态</strong>，不做纯关键字匹配。
+    因为文档、安全代码里出现 client_secret / password 这类词是完全正常的，
+    按关键字拦会造成误报，最终让人习惯性绕过安检 —— 那比没有安检更糟。
+
 .PARAMETER FeedPath
     待检查的包目录，默认 <仓库根>/local-feed。
 #>
@@ -50,17 +54,15 @@ $forbiddenFilePatterns = @(
     '*.rdp'
 )
 
-# 禁止出现在文本条目内容里的片段
+# 禁止出现在文本条目内容里的“真凭据”特征：
+# 关键字后面必须跟着一个足够长的不透明值，才算真凭据（单纯提词不算）。
 $forbiddenContentPatterns = @(
     'BEGIN PRIVATE KEY',
     'BEGIN RSA PRIVATE KEY',
+    'BEGIN OPENSSH PRIVATE KEY',
     'BEGIN CERTIFICATE',
-    'AccountKey=',
-    'SharedAccessKey=',
-    'Password=',
-    'SecretKey=',
-    'ApiKey=',
-    'client_secret'
+    '(?i)(password|passwd|pwd|secret|secretkey|apikey|accountkey|sharedaccesskey|client_secret|connectionstring)\s*[=:]\s*[\x22\x27]?[A-Za-z0-9+/_\-\.]{12,}',
+    '(?i)(AccountKey|SharedAccessKey|sig)=[A-Za-z0-9%+/_\-]{20,}'
 )
 
 $violations = [System.Collections.Generic.List[string]]::new()
@@ -86,7 +88,7 @@ foreach ($package in $packages) {
             }
 
             $extension = [System.IO.Path]::GetExtension($entry.FullName).ToLowerInvariant()
-            if ($extension -notin '.json', '.config', '.xml', '.nuspec', '.props', '.targets', '.md') {
+            if ($extension -notin '.json', '.config', '.xml', '.nuspec', '.props', '.targets', '.md', '.txt', '.yml', '.yaml') {
                 continue
             }
 
@@ -94,9 +96,9 @@ foreach ($package in $packages) {
             $text = $reader.ReadToEnd()
             $reader.Close()
 
-            foreach ($fragment in $forbiddenContentPatterns) {
-                if ($text.Contains($fragment, [StringComparison]::OrdinalIgnoreCase)) {
-                    $violations.Add("$($package.Name)：$($entry.FullName) 含敏感片段 '$fragment'")
+            foreach ($pattern in $forbiddenContentPatterns) {
+                if ([regex]::IsMatch($text, $pattern)) {
+                    $violations.Add("$($package.Name)：$($entry.FullName) 命中敏感特征 /$pattern/")
                 }
             }
         }

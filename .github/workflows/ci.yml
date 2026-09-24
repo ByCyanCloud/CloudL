@@ -48,6 +48,9 @@ jobs:
       - name: 包内容安检（禁止配置/证书/密钥混入包）
         run: pwsh ./build/check-packages.ps1
 
+      - name: 包安检规则自测（防止规则静默失效）
+        run: pwsh ./build/test-check-packages.ps1
+
       - name: 依赖漏洞审计
         shell: bash
         run: |
