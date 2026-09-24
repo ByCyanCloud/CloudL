@@ -98,7 +98,6 @@ public static class ServiceCollectionExtensions
             var source = CloudLJson.SerializerOptions;
             var target = options.JsonSerializerOptions;
             target.PropertyNamingPolicy = source.PropertyNamingPolicy;
-            target.DictionaryKeyPolicy = source.DictionaryKeyPolicy;
             target.DefaultIgnoreCondition = source.DefaultIgnoreCondition;
             target.Encoder = source.Encoder;
             target.PropertyNameCaseInsensitive = true;
