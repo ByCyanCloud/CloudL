@@ -25,7 +25,7 @@ public class SnakeCaseQueryBindingTests
         Assert.Equal(expected, SnakeCaseQueryKey.ToPascalCase(input));
 
     [Fact]
-    public void Build_ShouldKeepOriginalKeyAndAddPascalCaseAlias()
+    public void Build_ShouldExposeOnlyConvertedKeys()
     {
         var query = new Dictionary<string, StringValues>
         {
@@ -36,28 +36,26 @@ public class SnakeCaseQueryBindingTests
 
         var values = SnakeCaseQueryKey.Build(query);
 
-        Assert.Equal("2", values["page_index"]);
+        // 三个参数 → 三个键，说明没有为原始键名额外开兼容通道
+        Assert.Equal(3, values.Count);
         Assert.Equal("2", values["PageIndex"]);
         Assert.Equal("50", values["PageSize"]);
         Assert.Equal("user_name", values["SortBy"]);
     }
 
     [Fact]
-    public void Build_ShouldPreferSnakeCaseValue_WhenBothFormsArePresent()
+    public void Build_ShouldConvertNestedKeys()
     {
-        var query = new Dictionary<string, StringValues>
-        {
-            ["page_index"] = "2",
-            ["pageIndex"] = "9"
-        };
+        var query = new Dictionary<string, StringValues> { ["filter.page_index"] = "3" };
 
         var values = SnakeCaseQueryKey.Build(query);
 
-        Assert.Equal("2", values["PageIndex"]);
+        Assert.Single(values);
+        Assert.Equal("3", values["Filter.PageIndex"]);
     }
 
     [Fact]
-    public void Build_ShouldLeavePlainKeysUntouched()
+    public void Build_ShouldKeepSingleWordKeys()
     {
         var query = new Dictionary<string, StringValues> { ["id"] = "abc" };
 
@@ -68,13 +66,13 @@ public class SnakeCaseQueryBindingTests
     }
 
     [Fact]
-    public void Build_ShouldBeCaseInsensitive_ForModelBindingLookups()
+    public void Build_ShouldPreserveMultipleValuesForSameKey()
     {
-        var query = new Dictionary<string, StringValues> { ["page_index"] = "3" };
+        var query = new Dictionary<string, StringValues> { ["user_ids"] = new[] { "1", "2", "3" } };
 
         var values = SnakeCaseQueryKey.Build(query);
 
-        Assert.Equal("3", values["PAGEINDEX"]);
+        Assert.Equal(new[] { "1", "2", "3" }, values["UserIds"]);
     }
 
     [Fact]

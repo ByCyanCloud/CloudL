@@ -9,40 +9,26 @@ namespace CloudL.AspNetCore.HttpApi.Binding;
 /// <summary>
 /// query 参数键的映射工具：把 snake_case 键映射为模型绑定可识别的 PascalCase 键。
 /// <para>约定：query 使用 snake_case（<c>?page_index=2&amp;sort_by=user_name</c>），
-/// 与 JSON 请求/响应体、验证错误键保持一致。</para>
+/// 与 JSON 请求/响应体、验证错误键保持一致；<strong>不为 camelCase 提供转换通道</strong>。</para>
 /// </summary>
 public static class SnakeCaseQueryKey
 {
     /// <summary>
-    /// 构建值提供器使用的字典：<strong>保留原始键</strong>（兼容既有 camelCase 调用方），
-    /// 并为 snake_case / 嵌套（含点）的键追加 PascalCase 别名。
+    /// 构建值提供器使用的字典：键统一取 <see cref="ToPascalCase"/> 的结果。
     /// </summary>
     /// <remarks>
-    /// 若同时传了 <c>page_index</c> 与 <c>pageIndex</c>，以 snake_case（约定写法）为准，
-    /// 保证行为确定而不是依赖参数顺序。
+    /// 不含下划线、不含点的单词键（如 <c>id</c>）原样保留 —— 它们本来也不属于 snake_case 的转换范围。
     /// </remarks>
     public static Dictionary<string, StringValues> Build(
         IEnumerable<KeyValuePair<string, StringValues>> query)
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var pairs = query as IReadOnlyList<KeyValuePair<string, StringValues>> ?? query.ToList();
         var values = new Dictionary<string, StringValues>(StringComparer.OrdinalIgnoreCase);
 
-        // 第一遍：原始键
-        foreach (var pair in pairs)
+        foreach (var pair in query)
         {
-            values[pair.Key] = pair.Value;
-        }
-
-        // 第二遍：为 snake_case / 嵌套键追加 PascalCase 别名
-        foreach (var pair in pairs)
-        {
-            var pascalCaseKey = ToPascalCase(pair.Key);
-            if (!string.Equals(pascalCaseKey, pair.Key, StringComparison.Ordinal))
-            {
-                values[pascalCaseKey] = pair.Value;
-            }
+            values[ToPascalCase(pair.Key)] = pair.Value;
         }
 
         return values;
@@ -53,8 +39,8 @@ public static class SnakeCaseQueryKey
     /// <c>page_index</c> → <c>PageIndex</c>、<c>filter.sort_by</c> → <c>Filter.SortBy</c>。
     /// </summary>
     /// <remarks>
-    /// 只在需要改写时处理：含下划线（snake_case）或含点（嵌套模型）。
-    /// 纯粹的 camelCase / 单词键原样返回，避免改变既有语义。
+    /// 只在需要改写时处理：含下划线（snake_case）或含点（嵌套模型）；
+    /// 单词键（如 <c>id</c>）原样返回。
     /// </remarks>
     public static string ToPascalCase(string key)
     {

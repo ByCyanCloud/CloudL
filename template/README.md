@@ -100,7 +100,7 @@ dotnet nuget add source <框架仓库路径>/local-feed -n cloudl-local
 | Query 参数 | `?page_index=2&page_size=50&sort_by=user_name&sort_direction=asc` |
 | 验证错误键 | `{"errors":{"page_index":["页码必须大于等于 1"]}}` |
 
-query 参数同时兼容 camelCase（`?pageIndex=2`）以便平滑迁移，但推荐统一用 snake_case。
+query 参数统一使用 **snake_case**（`?page_index=2`）；框架不为 camelCase 提供转换通道。
 
 ## 必须修改的配置
 
