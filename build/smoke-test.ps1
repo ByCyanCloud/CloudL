@@ -63,7 +63,20 @@ if (Test-Path $OutputDir) {
     Remove-Item -Path $OutputDir -Recurse -Force
 }
 
-& dotnet new cloudl -n $projectName -o $OutputDir
+# 关键：显式指定刚打出来的框架版本。
+# 否则模板默认的浮动版本会解析到已发布的旧包，冒烟测试就覆盖不到本次改动的代码。
+$corePackage = Get-ChildItem (Join-Path $repoRoot 'local-feed') -Filter 'CloudL.Core.*.nupkg' -File |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+
+if (-not $corePackage) {
+    throw '"local-feed 中没有 CloudL.Core 包，请先执行打包。'
+}
+
+$frameworkVersion = $corePackage.Name.Substring('CloudL.Core.'.Length).Replace('.nupkg', '')
+Write-Host "使用框架版本: $frameworkVersion" -ForegroundColor Yellow
+
+& dotnet new cloudl -n $projectName -o $OutputDir --frameworkVersion $frameworkVersion
 Assert-LastExitCode '生成项目'
 
 $solution = Join-Path $OutputDir "$projectName.slnx"

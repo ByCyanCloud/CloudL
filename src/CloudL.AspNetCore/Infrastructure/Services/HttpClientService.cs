@@ -170,7 +170,7 @@ public class HttpClientService : IHttpClientService
             var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
             _logger.LogWarning(
-                "第三方请求失败: {ClientName} {Method} {Url} -> {StatusCode} {ReasonPhrase}\n{Body}",
+                "\n第三方请求失败: {ClientName} {Method} {Url} -> {StatusCode} {ReasonPhrase}\n{Body}",
                 clientName, method, url, (int)response.StatusCode, response.ReasonPhrase, Truncate(responseBody));
 
             var statusCode = (int)response.StatusCode;

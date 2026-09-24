@@ -45,6 +45,19 @@ jobs:
       - name: 打包
         run: pwsh ./build/pack.ps1 -SkipTemplateInstall
 
+      - name: 包内容安检（禁止配置/证书/密钥混入包）
+        run: pwsh ./build/check-packages.ps1
+
+      - name: 依赖漏洞审计
+        shell: bash
+        run: |
+          output=$(dotnet list CloudL.slnx package --vulnerable --include-transitive)
+          echo "$output"
+          if echo "$output" | grep -q "vulnerable packages"; then
+            echo "::error::检测到存在已知漏洞的依赖，请升级后重试"
+            exit 1
+          fi
+
       - name: 模板冒烟测试（生成 → 编译 → 测试 → 迁移一致性）
         run: pwsh ./build/smoke-test.ps1 -SkipPack
 

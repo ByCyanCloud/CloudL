@@ -49,6 +49,9 @@ jobs:
       - name: 冒烟测试（含打包到 local-feed）
         run: pwsh ./build/smoke-test.ps1
 
+      - name: 包内容安检（禁止配置/证书/密钥混入包）
+        run: pwsh ./build/check-packages.ps1
+
       - name: 列出待发布的包
         run: ls -l local-feed/*.nupkg
 

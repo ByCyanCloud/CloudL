@@ -133,7 +133,11 @@ public class EfCoreRepository<TEntity, TKey> : IRepository<TEntity, TKey>
         var totalCount = await query.CountAsync(cancellationToken).ConfigureAwait(false);
 
         orderBy ??= entity => entity.CreatedAt;
-        query = descending ? query.OrderByDescending(orderBy) : query.OrderBy(orderBy);
+        // 追加主键作为次级排序键：只按业务字段排序时，并列值之间的顺序在 SQL 中未定义，
+        // 会导致翻页出现重复行或漏行。
+        query = descending
+            ? query.OrderByDescending(orderBy).ThenBy(entity => entity.Id)
+            : query.OrderBy(orderBy).ThenBy(entity => entity.Id);
 
         var items = await query
             .Skip((pageIndex - 1) * pageSize)

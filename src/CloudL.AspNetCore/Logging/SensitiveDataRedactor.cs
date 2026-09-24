@@ -1,17 +1,32 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace CloudL.AspNetCore.Logging;
 
 /// <summary>
 /// 日志脱敏工具。
-/// 用于在记录请求体与认证头时遮蔽口令、令牌等敏感信息 —— 明文凭据绝不应进入日志文件。
+/// 采用<strong>两层</strong>策略，避免"改了个字段名就漏"的问题：
+/// <list type="number">
+///   <item>按键名遮蔽：<c>password</c>、<c>refreshToken</c>、<c>clientSecret</c> 等常见敏感字段；</item>
+///   <item>按值的形态遮蔽：JWT 形状的字符串、以及长串不透明令牌（≥40 位 base64/hex 风格字符），
+///         即使键名起成 <c>pwd</c>、<c>pin</c>、<c>ticket</c> 也会被遮住。</item>
+/// </list>
+/// 非 JSON 请求体整体省略（只保留长度），避免误记敏感内容。
 /// </summary>
 public static class SensitiveDataRedactor
 {
-    private const string Mask = "\"***\"";
+    private const string Mask = "***";
     private const int MaxBodyLength = 4096;
 
+    /// <summary>序列化脱敏结果时保留中文可读性（默认编码器会把中文转义成 Unicode 转义序列）。</summary>
+    private static readonly JsonSerializerOptions RedactedJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
+    /// <summary>按名遮蔽的字段名（大小写不敏感）。</summary>
     private static readonly HashSet<string> SensitiveKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         "password",
@@ -30,12 +45,24 @@ public static class SensitiveDataRedactor
         "authorization",
         "credential",
         "credentials",
-        "signature"
+        "signature",
+        "pwd",
+        "pin"
     };
+
+    /// <summary>JWT 形状：三段 base64url，以 eyJ 开头。</summary>
+    private static readonly Regex JwtPattern = new(
+        @"^eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]*$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>长串不透明令牌：≥40 位 base64/hex 风格字符（不含点、@、空格，避免误伤邮箱与路径）。</summary>
+    private static readonly Regex OpaqueTokenPattern = new(
+        @"^[A-Za-z0-9_\-+/=]{40,}$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     /// <summary>
     /// 脱敏请求体。
-    /// JSON 体会按键名递归遮蔽敏感字段；非 JSON 体会整体省略（只保留长度），避免误记敏感内容。
+    /// JSON 体会递归处理；非 JSON 体整体省略（只保留长度），避免误记敏感内容。
     /// </summary>
     public static string RedactBody(string? body)
     {
@@ -43,9 +70,12 @@ public static class SensitiveDataRedactor
             return string.Empty;
 
         var trimmed = body.Trim();
+        var truncated = false;
+
         if (trimmed.Length > MaxBodyLength)
         {
             trimmed = trimmed[..MaxBodyLength];
+            truncated = true;
         }
 
         if (trimmed[0] is not ('{' or '['))
@@ -58,11 +88,14 @@ public static class SensitiveDataRedactor
                 return "[请求体解析结果为空]";
 
             RedactNode(node);
-            return node.ToJsonString();
+
+            var redacted = node.ToJsonString(RedactedJsonOptions);
+            return truncated ? redacted + "...(已截断)" : redacted;
         }
         catch (JsonException)
         {
-            return "[请求体非合法 JSON，内容已省略]";
+            // 截断可能破坏 JSON 结构；此时整体省略而不是原样输出
+            return "[请求体非合法 JSON 或已被截断，内容已省略]";
         }
     }
 
@@ -91,23 +124,55 @@ public static class SensitiveDataRedactor
                     if (SensitiveKeys.Contains(property.Key))
                     {
                         jsonObject[property.Key] = Mask;
+                        continue;
                     }
-                    else if (property.Value is not null)
+
+                    if (TryMaskString(property.Value, out var masked))
                     {
-                        RedactNode(property.Value);
+                        jsonObject[property.Key] = masked;
+                        continue;
                     }
+
+                    if (property.Value is not null)
+                        RedactNode(property.Value);
                 }
 
                 break;
 
             case JsonArray jsonArray:
-                foreach (var item in jsonArray)
+                for (var index = 0; index < jsonArray.Count; index++)
                 {
-                    if (item is not null)
-                        RedactNode(item);
+                    if (TryMaskString(jsonArray[index], out var masked))
+                    {
+                        jsonArray[index] = masked;
+                        continue;
+                    }
+
+                    if (jsonArray[index] is not null)
+                        RedactNode(jsonArray[index]!);
                 }
 
                 break;
         }
+    }
+
+    private static bool TryMaskString(JsonNode? node, out string masked)
+    {
+        masked = Mask;
+
+        if (node is JsonValue value && value.TryGetValue<string>(out var text) && LooksLikeSecret(text))
+            return true;
+
+        masked = string.Empty;
+        return false;
+    }
+
+    /// <summary>按键名兜不住的部分：靠值的形态识别。</summary>
+    private static bool LooksLikeSecret(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        return JwtPattern.IsMatch(value) || OpaqueTokenPattern.IsMatch(value);
     }
 }

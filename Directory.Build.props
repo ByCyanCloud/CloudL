@@ -36,6 +36,17 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>
 
+    <!-- 依赖漏洞审计：包含传递依赖，低危也报（NU1901-NU1904） -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+
+    <!--
+      Release 构建启用 CI 语义：SDK 会自动做路径映射，
+      避免符号包（.snupkg）里的 PDB 泄露本机绝对路径与用户名。
+    -->
+    <ContinuousIntegrationBuild Condition="'$(Configuration)' == 'Release'">true</ContinuousIntegrationBuild>
+
     <!-- 默认不打包：仅 src/ 下的框架项目显式打开 IsPackable -->
     <IsPackable>false</IsPackable>
   </PropertyGroup>

@@ -53,7 +53,7 @@ public class ValidationFilter : IAsyncActionFilter
             await context.HttpContext.Request.ReadBodyAsync().ConfigureAwait(false));
 
         _logger.LogWarning(
-            "请求参数验证失败\n[ErrorId={ErrorId}]\n{Method} {Path}{QueryString}\n[Body]\n{Body}",
+            "\n请求参数验证失败\n[ErrorId={ErrorId}]\n{Method} {Path}{QueryString}\n[Body]\n{Body}",
             response.ErrorId,
             context.HttpContext.Request.Method,
             context.HttpContext.Request.Path,
