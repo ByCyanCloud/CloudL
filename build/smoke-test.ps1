@@ -63,7 +63,7 @@ if (Test-Path $OutputDir) {
     Remove-Item -Path $OutputDir -Recurse -Force
 }
 
-& dotnet new livia -n $projectName -o $OutputDir
+& dotnet new cloudl -n $projectName -o $OutputDir
 Assert-LastExitCode '生成项目'
 
 $solution = Join-Path $OutputDir "$projectName.slnx"

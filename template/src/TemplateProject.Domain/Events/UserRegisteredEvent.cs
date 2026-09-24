@@ -1,4 +1,4 @@
-using Livia.Domain.DomainEvents;
+using CloudL.Domain.DomainEvents;
 
 namespace TemplateProject.Domain.Events;
 

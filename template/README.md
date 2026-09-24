@@ -1,6 +1,6 @@
 # TemplateProject
 
-基于 **Livia 框架**（NuGet 包）的 DDD 九层 Web API 业务骨架，目标框架 .NET 10。
+基于 **CloudL 框架**（NuGet 包）的 DDD 九层 Web API 业务骨架，目标框架 .NET 10。
 
 > 本 README 由模板生成，请按项目实际情况修改。
 
@@ -26,20 +26,20 @@ Swagger：`http://localhost:10003/swagger`　健康检查：`http://localhost:10
 
 | 层 | 职责 | 框架能力来自 |
 |---|---|---|
-| `Domain.Shared` | 业务枚举、常量（如角色码） | `Livia.Core`（`AppConstants`/`ErrorCodes`/业务异常基类） |
-| `Domain` | 实体、值对象、仓储接口、领域事件 | `Livia.Core`（`AuditableEntity`/`ValueObject`/`IRepository`/`IDomainEvent`） |
-| `Application.Contracts` | DTO、服务接口 | `Livia.Core`（`PagedRequestDto`/`IPasswordHasher`/`ICurrentUser` 等契约） |
-| `Application` | 用例编排、DTO 映射、领域事件处理器 | `Livia.Core`（领域事件分发、Mapster 全局约定） |
-| `Infrastructure` | 业务侧基础设施（邮件、短信、第三方适配） | `Livia.AspNetCore`（`IHttpClientService`/`IPasswordHasher` 实现） |
-| `EntityFrameworkCore` | `AppDbContext`、实体配置、**迁移** | `Livia.EntityFrameworkCore`（`FrameworkDbContext`/仓储/配置基类） |
-| `HttpApi` | 控制器 | `Livia.AspNetCore`（`BaseApiController`/统一响应/异常与验证） |
-| `Web` | 启动与配置 | `Livia.AspNetCore`（`AddLiviaAspNetCore`/JWT/CORS/Swagger） |
-| `DbMigrator` | 数据库迁移与种子数据 | `Livia.EntityFrameworkCore` |
+| `Domain.Shared` | 业务枚举、常量（如角色码） | `CloudL.Core`（`AppConstants`/`ErrorCodes`/业务异常基类） |
+| `Domain` | 实体、值对象、仓储接口、领域事件 | `CloudL.Core`（`AuditableEntity`/`ValueObject`/`IRepository`/`IDomainEvent`） |
+| `Application.Contracts` | DTO、服务接口 | `CloudL.Core`（`PagedRequestDto`/`IPasswordHasher`/`ICurrentUser` 等契约） |
+| `Application` | 用例编排、DTO 映射、领域事件处理器 | `CloudL.Core`（领域事件分发、Mapster 全局约定） |
+| `Infrastructure` | 业务侧基础设施（邮件、短信、第三方适配） | `CloudL.AspNetCore`（`IHttpClientService`/`IPasswordHasher` 实现） |
+| `EntityFrameworkCore` | `AppDbContext`、实体配置、**迁移** | `CloudL.EntityFrameworkCore`（`FrameworkDbContext`/仓储/配置基类） |
+| `HttpApi` | 控制器 | `CloudL.AspNetCore`（`BaseApiController`/统一响应/异常与验证） |
+| `Web` | 启动与配置 | `CloudL.AspNetCore`（`AddCloudLAspNetCore`/JWT/CORS/Swagger） |
+| `DbMigrator` | 数据库迁移与种子数据 | `CloudL.EntityFrameworkCore` |
 
 ### ⚠️ 重要约定：框架代码不在本仓库里
 
 `Entity<TKey>`、`IRepository<,>`、`FrameworkDbContext`、`ExceptionHandlingMiddleware`、`ApiResponse`、
-`JwtTokenService`、`Pbkdf2PasswordHasher` 等**全部来自 Livia 的三个 NuGet 包**，本仓库只放业务代码。
+`JwtTokenService`、`Pbkdf2PasswordHasher` 等**全部来自 CloudL 的三个 NuGet 包**，本仓库只放业务代码。
 
 - ❌ 不要把框架代码复制进本项目 —— 那会造成分叉，之后无法跟随框架升级。
 - ✅ 需要改框架行为时，优先用框架提供的扩展点：Options 配置、覆写 `FrameworkDbContext` 的虚方法、
@@ -57,10 +57,10 @@ Swagger：`http://localhost:10003/swagger`　健康检查：`http://localhost:10
 dotnet package update
 
 # 或指定版本
-dotnet package update Livia.Core Livia.EntityFrameworkCore Livia.AspNetCore
+dotnet package update CloudL.Core CloudL.EntityFrameworkCore CloudL.AspNetCore
 
 # 回滚
-dotnet package update Livia.Core@0.1.0
+dotnet package update CloudL.Core@0.1.0
 ```
 
 升级前请先看框架 `CHANGELOG.md` 中的**「迁移影响」**：若声明需要新增 EF 迁移，执行
@@ -73,22 +73,22 @@ dotnet ef migrations add <Name> --project src/TemplateProject.EntityFrameworkCor
 ### 生成时指定框架版本
 
 ```powershell
-dotnet new livia -n MyApp --frameworkVersion 1.2.0
+dotnet new cloudl -n MyApp --frameworkVersion 1.2.0
 ```
 
 模板默认使用浮动版本（`0.1.0-*`，即 0.1 线的最新预览版），便于本地开发始终取到最新构建；
 `Directory.Packages.props` 中已开启 `CentralPackageFloatingVersionsEnabled` 以允许此写法。
-**正式项目建议把 `LiviaVersion` 固定为具体版本**，让构建可复现。
+**正式项目建议把 `CloudLVersion` 固定为具体版本**，让构建可复现。
 
 ### 本地联调（框架包尚未发布到 nuget.org 时）
 
 先把框架仓库的本地源注册到本机（只需一次）：
 
 ```powershell
-dotnet nuget add source <框架仓库路径>/local-feed -n livia-local
+dotnet nuget add source <框架仓库路径>/local-feed -n cloudl-local
 ```
 
-之后 `dotnet restore` 即可从本地源解析 `Livia.*` 包。
+之后 `dotnet restore` 即可从本地源解析 `CloudL.*` 包。
 
 ## 必须修改的配置
 

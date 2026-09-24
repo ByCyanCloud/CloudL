@@ -15,11 +15,11 @@
 
 | 接口 | 由谁提供 |
 |---|---|
-| `IPasswordHasher` | `Livia.AspNetCore`（PBKDF2-HMAC-SHA512，带版本化哈希与透明升级） |
-| `IJwtTokenService` | `Livia.AspNetCore` |
-| `IRefreshTokenStore` | `Livia.AspNetCore`（默认进程内实现；多实例请替换为 Redis/数据库实现） |
-| `ICurrentUser` | `Livia.AspNetCore`（从 JWT Claims 解析） |
-| `IHttpClientService` | `Livia.AspNetCore`（具名客户端，配置段 `HttpClients`） |
+| `IPasswordHasher` | `CloudL.AspNetCore`（PBKDF2-HMAC-SHA512，带版本化哈希与透明升级） |
+| `IJwtTokenService` | `CloudL.AspNetCore` |
+| `IRefreshTokenStore` | `CloudL.AspNetCore`（默认进程内实现；多实例请替换为 Redis/数据库实现） |
+| `ICurrentUser` | `CloudL.AspNetCore`（从 JWT Claims 解析） |
+| `IHttpClientService` | `CloudL.AspNetCore`（具名客户端，配置段 `HttpClients`） |
 
 若需替换框架默认实现，直接注册自己的实现即可覆盖（框架内部使用 `TryAdd*` 注册）：
 

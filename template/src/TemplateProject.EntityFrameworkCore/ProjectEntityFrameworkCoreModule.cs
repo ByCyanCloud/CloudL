@@ -1,4 +1,4 @@
-using Livia.EntityFrameworkCore;
+using CloudL.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TemplateProject.Domain.Repositories;
@@ -25,7 +25,7 @@ public static class ProjectEntityFrameworkCoreModule
         ArgumentNullException.ThrowIfNull(configuration);
 
         // 框架：DbContext（审计/乐观锁/领域事件）+ 通用仓储 IRepository<,> + 工作单元
-        services.AddLiviaEntityFrameworkCore<TContext>(configuration);
+        services.AddCloudLEntityFrameworkCore<TContext>(configuration);
 
         // 业务：专用仓储
         services.AddScoped<IUserRepository, UserRepository>();

@@ -9,7 +9,7 @@ namespace TemplateProject.Infrastructure;
 /// <remarks>
 /// 本层只放<strong>业务侧</strong>的基础设施实现（邮件、短信、文件存储、第三方 API 适配器等）。
 /// 框架级基础设施 —— 密码哈希、JWT 令牌、当前用户上下文、Refresh Token 存储、HTTP 客户端 ——
-/// 已由 <c>Livia.AspNetCore</c> 提供，无需在此重复注册。
+/// 已由 <c>CloudL.AspNetCore</c> 提供，无需在此重复注册。
 /// </remarks>
 public static class ProjectInfrastructureModule
 {

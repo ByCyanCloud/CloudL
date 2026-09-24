@@ -1,6 +1,6 @@
-using Livia.Application.Contracts.IServices;
-using Livia.Domain.DomainEvents;
-using Livia.EntityFrameworkCore;
+using CloudL.Application.Contracts.IServices;
+using CloudL.Domain.DomainEvents;
+using CloudL.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using TemplateProject.Domain.Entities;
 

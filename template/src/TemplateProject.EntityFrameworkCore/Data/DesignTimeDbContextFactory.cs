@@ -1,4 +1,4 @@
-using Livia.EntityFrameworkCore.Extensions;
+using CloudL.EntityFrameworkCore.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -36,7 +36,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
             ?? DbContextOptionsExtensions.PostgreSqlProvider;
 
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseLiviaDatabaseProvider(connectionString, provider);
+        optionsBuilder.UseCloudLDatabaseProvider(connectionString, provider);
 
         return new AppDbContext(optionsBuilder.Options);
     }

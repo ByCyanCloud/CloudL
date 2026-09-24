@@ -5,8 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Livia.Core" />
-    <PackageReference Include="Livia.EntityFrameworkCore" />
+    <PackageReference Include="CloudL.Core" />
+    <PackageReference Include="CloudL.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>

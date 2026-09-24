@@ -1,4 +1,4 @@
-using Livia.EntityFrameworkCore.EntityConfigurations;
+using CloudL.EntityFrameworkCore.EntityConfigurations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TemplateProject.Domain.Entities;

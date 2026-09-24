@@ -1,11 +1,11 @@
 {
   "$schema": "http://json.schemastore.org/template",
-  "author": "Livia",
+  "author": "CloudL",
   "classifications": [ "Web", "WebAPI", "DDD", "Clean Architecture" ],
-  "identity": "Livia.WebApi",
-  "name": "Livia DDD Web API Framework (.NET 10)",
-  "description": "基于 Livia 框架（NuGet 包）的 DDD 九层 Web API 业务骨架。框架能力全部来自 Livia.Core / Livia.EntityFrameworkCore / Livia.AspNetCore 三个包。",
-  "shortName": "livia",
+  "identity": "CloudL.WebApi",
+  "name": "CloudL DDD Web API Framework (.NET 10)",
+  "description": "基于 CloudL 框架（NuGet 包）的 DDD 九层 Web API 业务骨架。框架能力全部来自 CloudL.Core / CloudL.EntityFrameworkCore / CloudL.AspNetCore 三个包。",
+  "shortName": "cloudl",
   "sourceName": "TemplateProject",
   "preferNameDirectory": true,
   "tags": {
@@ -17,8 +17,8 @@
       "type": "parameter",
       "datatype": "text",
       "defaultValue": "0.1.0-*",
-      "replaces": "LIVIA_VERSION",
-      "description": "Livia 框架包版本。本地开发用浮动版本（0.1.0-*）即可；正式项目建议锁定为具体版本，例如 1.2.0。"
+      "replaces": "CLOUDL_VERSION",
+      "description": "CloudL 框架包版本。本地开发用浮动版本（0.1.0-*）即可；正式项目建议锁定为具体版本，例如 1.2.0。"
     }
   },
   "sources": [

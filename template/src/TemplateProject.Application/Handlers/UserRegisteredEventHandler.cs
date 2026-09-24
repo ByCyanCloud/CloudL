@@ -1,5 +1,5 @@
-using Livia.Application.Contracts.IServices;
-using Livia.Domain.DomainEvents;
+using CloudL.Application.Contracts.IServices;
+using CloudL.Domain.DomainEvents;
 using Microsoft.Extensions.Logging;
 using TemplateProject.Domain.Events;
 

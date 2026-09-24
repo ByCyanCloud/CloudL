@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <AssemblyName>CloudL.AspNetCore</AssemblyName>
+    <RootNamespace>CloudL</RootNamespace>
+    <PackageId>CloudL.AspNetCore</PackageId>
+    <Title>CloudL AspNetCore</Title>
+    <Description>CloudL DDD 框架 ASP.NET Core 集成：统一响应、全局异常与模型验证、JWT/CORS/Swagger、当前用户上下文、PBKDF2 密码哈希与 HTTP 客户端封装。</Description>
+    <PackageTags>ddd;aspnetcore;framework;cloudl</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <!--
+    注意：Microsoft.Extensions.Http / Options / Configuration 等已包含在
+    Microsoft.AspNetCore.App 共享框架中，无需（也不应）再显式引用，否则会产生 NU1510。
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CloudL.Core\CloudL.Core.csproj" />
+  </ItemGroup>
+
+</Project>

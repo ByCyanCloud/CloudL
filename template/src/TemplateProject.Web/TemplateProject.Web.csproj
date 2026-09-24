@@ -5,9 +5,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Livia.Core" />
-    <PackageReference Include="Livia.EntityFrameworkCore" />
-    <PackageReference Include="Livia.AspNetCore" />
+    <PackageReference Include="CloudL.Core" />
+    <PackageReference Include="CloudL.EntityFrameworkCore" />
+    <PackageReference Include="CloudL.AspNetCore" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />

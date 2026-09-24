@@ -9,8 +9,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Livia.Core" />
-    <PackageReference Include="Livia.AspNetCore" />
+    <PackageReference Include="CloudL.Core" />
+    <PackageReference Include="CloudL.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,7 +1,7 @@
-using Livia.AspNetCore.HttpApi.Base;
-using Livia.AspNetCore.HttpApi.Extensions;
-using Livia.Application.Contracts.Dtos;
-using Livia.Application.Contracts.IServices;
+using CloudL.AspNetCore.HttpApi.Base;
+using CloudL.AspNetCore.HttpApi.Extensions;
+using CloudL.Application.Contracts.Dtos;
+using CloudL.Application.Contracts.IServices;
 using TemplateProject.Application.Contracts.Dtos;
 using TemplateProject.Application.Contracts.IServices;
 

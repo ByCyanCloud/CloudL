@@ -22,9 +22,9 @@
     <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
 
     <!-- 包元数据 -->
-    <Authors>Livia</Authors>
-    <Company>Livia</Company>
-    <Product>Livia</Product>
+    <Authors>CloudL</Authors>
+    <Company>CloudL</Company>
+    <Product>CloudL</Product>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <RepositoryType>git</RepositoryType>

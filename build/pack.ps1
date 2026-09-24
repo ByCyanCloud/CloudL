@@ -1,12 +1,12 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-    打包 Livia 框架 NuGet 包，推送到本机源，并按需重装 dotnet new 模板。
+    打包 CloudL 框架 NuGet 包，推送到本机源，并按需重装 dotnet new 模板。
 
 .DESCRIPTION
     1. 依次打包 src/ 下的三个框架项目到 local-feed（或 -FeedPath 指定的目录）；
     2. 可选：推送到远程源（GitHub Packages / nuget.org）；
-    3. 可选：重装 template/ 下的 dotnet new 模板，使 `dotnet new livia` 可用。
+    3. 可选：重装 template/ 下的 dotnet new 模板，使 `dotnet new cloudl` 可用。
 
 .PARAMETER Configuration
     构建配置，默认 Release。
@@ -65,9 +65,9 @@ if (-not (Test-Path $FeedPath)) {
 $FeedPath = (Resolve-Path $FeedPath).Path
 
 $projects = @(
-    'src/Livia.Core/Livia.Core.csproj',
-    'src/Livia.EntityFrameworkCore/Livia.EntityFrameworkCore.csproj',
-    'src/Livia.AspNetCore/Livia.AspNetCore.csproj'
+    'src/CloudL.Core/CloudL.Core.csproj',
+    'src/CloudL.EntityFrameworkCore/CloudL.EntityFrameworkCore.csproj',
+    'src/CloudL.AspNetCore/CloudL.AspNetCore.csproj'
 )
 
 Write-Host "==> 输出目录: $FeedPath" -ForegroundColor Cyan
@@ -92,12 +92,12 @@ foreach ($project in $projects) {
     }
 }
 
-$produced = Get-ChildItem -Path $FeedPath -Filter 'Livia.*.nupkg' -File |
+$produced = Get-ChildItem -Path $FeedPath -Filter 'CloudL.*.nupkg' -File |
     Sort-Object LastWriteTime -Descending |
     Select-Object -First 3
 
 if ($produced.Count -eq 0) {
-    throw "未在 $FeedPath 找到任何 Livia.*.nupkg，请检查打包输出。"
+    throw "未在 $FeedPath 找到任何 CloudL.*.nupkg，请检查打包输出。"
 }
 
 Write-Host "==> 已生成:" -ForegroundColor Green
@@ -133,7 +133,7 @@ if (-not $SkipTemplateInstall) {
             throw "模板安装失败: $templatePath"
         }
 
-        Write-Host "==> 模板已就绪：dotnet new livia -n MyApp" -ForegroundColor Green
+        Write-Host "==> 模板已就绪：dotnet new cloudl -n MyApp" -ForegroundColor Green
     }
     else {
         Write-Warning "未找到模板目录，已跳过：$templatePath"

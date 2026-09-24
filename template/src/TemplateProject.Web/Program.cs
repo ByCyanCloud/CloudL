@@ -1,8 +1,8 @@
-using Livia.Application;
-using Livia.AspNetCore.Configuration;
-using Livia.AspNetCore.Extensions;
-using Livia.AspNetCore.HttpApi.Filters;
-using Livia.AspNetCore.HttpApi.Middlewares;
+using CloudL.Application;
+using CloudL.AspNetCore.Configuration;
+using CloudL.AspNetCore.Extensions;
+using CloudL.AspNetCore.HttpApi.Filters;
+using CloudL.AspNetCore.HttpApi.Middlewares;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
@@ -15,7 +15,7 @@ using TemplateProject.HttpApi.Controllers;
 using TemplateProject.Infrastructure;
 
 // ============================================================
-// TemplateProject — 基于 Livia 框架的 DDD Web API
+// TemplateProject — 基于 CloudL 框架的 DDD Web API
 // ============================================================
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,11 +27,11 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .Enrich.FromLogContext());
 
 // ---------- 框架：领域事件分发 + Mapster 全局约定 + 扫描业务映射 ----------
-builder.Services.AddLiviaCore(typeof(UserMappingRegister).Assembly);
+builder.Services.AddCloudLCore(typeof(UserMappingRegister).Assembly);
 
 // ---------- 框架：JWT / CORS / Swagger / 当前用户 / 密码哈希 / HTTP 客户端 ----------
 // 配置缺失或非法会在启动阶段直接报错（ValidateOnStart），不会拖到第一次请求
-builder.Services.AddLiviaAspNetCore(builder.Configuration);
+builder.Services.AddCloudLAspNetCore(builder.Configuration);
 
 // ---------- 业务各层 ----------
 builder.Services.AddProjectInfrastructure(builder.Configuration);
@@ -45,7 +45,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 builder.Services
     .AddControllers(options => options.Filters.Add<ValidationFilter>())
-    .AddLiviaJsonOptions();
+    .AddCloudLJsonOptions();
 
 // ---------- 授权 ----------
 builder.Services.AddAuthorization(options =>
@@ -66,7 +66,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
 // ---------- Swagger（含 JWT 安全定义与 XML 注释） ----------
-builder.Services.AddLiviaSwagger(
+builder.Services.AddCloudLSwagger(
     "TemplateProject API",
     typeof(UsersController).Assembly,
     typeof(UserDto).Assembly);
@@ -85,7 +85,7 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseLiviaSwagger();
+    app.UseCloudLSwagger();
 }
 
 app.UseCors(CorsOptions.DefaultPolicyName);

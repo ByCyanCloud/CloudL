@@ -1,4 +1,4 @@
-# Livia
+# CloudL
 
 面向 **.NET 10** 的 DDD Web API 框架。框架以 **NuGet 包**形式发布，业务项目通过引用包使用框架；
 框架升级 = 改版本号（或 `dotnet package update`），不再需要复制/同步源码。
@@ -7,14 +7,14 @@
 
 | 包 | 内容 |
 |---|---|
-| `Livia.Core` | 领域基类（`Entity<TKey>`/`AuditableEntity`/`ValueObject`）、共享内核（常量、异常）、应用契约（分页 DTO、服务接口）、领域事件分发、Mapster 全局约定 |
-| `Livia.EntityFrameworkCore` | `FrameworkDbContext`（审计/乐观锁/领域事件）、`EfCoreRepository<,>`、`EfCoreUnitOfWork`、实体配置基类、`AddFrameworkDbContext<TContext>()` |
-| `Livia.AspNetCore` | 统一响应 `ApiResponse`、全局异常中间件、模型验证过滤器、JWT/CORS/Swagger 集成、当前用户上下文、PBKDF2 密码哈希、HTTP 客户端封装、`AddFramework()` |
+| `CloudL.Core` | 领域基类（`Entity<TKey>`/`AuditableEntity`/`ValueObject`）、共享内核（常量、异常）、应用契约（分页 DTO、服务接口）、领域事件分发、Mapster 全局约定 |
+| `CloudL.EntityFrameworkCore` | `FrameworkDbContext`（审计/乐观锁/领域事件）、`EfCoreRepository<,>`、`EfCoreUnitOfWork`、实体配置基类、`AddFrameworkDbContext<TContext>()` |
+| `CloudL.AspNetCore` | 统一响应 `ApiResponse`、全局异常中间件、模型验证过滤器、JWT/CORS/Swagger 集成、当前用户上下文、PBKDF2 密码哈希、HTTP 客户端封装、`AddFramework()` |
 
 ## 业务项目快速开始
 
 ```powershell
-dotnet new livia -n MyCompany.BookStore -o ./BookStore
+dotnet new cloudl -n MyCompany.BookStore -o ./BookStore
 cd ./BookStore
 dotnet build
 ```
@@ -24,11 +24,11 @@ dotnet build
 ## 目录结构
 
 ```
-Livia/
+CloudL/
 ├── Directory.Build.props          # 全仓库统一的 TFM / 语言 / 包元数据
 ├── Directory.Packages.props       # 中央包管理：所有版本集中在此
 ├── nuget.config                   # 包源 + 源映射（防依赖混淆）
-├── Livia.slnx                     # 框架解决方案
+├── CloudL.slnx                     # 框架解决方案
 ├── build/pack.ps1                 # 打包脚本：pack + 推本地源 + 装模板
 ├── src/                           # 三个框架包
 ├── tests/                         # 单元测试 + 模板冒烟测试
@@ -40,13 +40,13 @@ Livia/
 
 ```powershell
 # 构建
-dotnet build Livia.slnx
+dotnet build CloudL.slnx
 
 # 打包并推送到本机源 local-feed，然后重装模板
 pwsh ./build/pack.ps1
 
 # 冒烟验证：生成一个项目并编译
-dotnet new livia -n SmokeTest -o ./artifacts/smoke
+dotnet new cloudl -n SmokeTest -o ./artifacts/smoke
 dotnet build ./artifacts/smoke
 ```
 
@@ -62,7 +62,7 @@ dotnet build ./artifacts/smoke
 # 升级到最新
 dotnet package update
 # 或锁定到指定版本
-dotnet package update Livia.Core@0.2.0 Livia.EntityFrameworkCore@0.2.0 Livia.AspNetCore@0.2.0
+dotnet package update CloudL.Core@0.2.0 CloudL.EntityFrameworkCore@0.2.0 CloudL.AspNetCore@0.2.0
 # 回滚
-dotnet package update Livia.Core@0.1.0
+dotnet package update CloudL.Core@0.1.0
 ```

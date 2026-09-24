@@ -6,7 +6,7 @@
 ## [未发布]
 
 ### 新增
-- 框架从单体模板改造为 NuGet 包：`Livia.Core`、`Livia.EntityFrameworkCore`、`Livia.AspNetCore`。
+- 框架从单体模板改造为 NuGet 包：`CloudL.Core`、`CloudL.EntityFrameworkCore`、`CloudL.AspNetCore`。
 - 引入中央包管理（`Directory.Packages.props`）与 MinVer 版本自动化。
 - 新增包源映射（`nuget.config`），防御依赖混淆。
 - 新增 `FrameworkDbContext`，业务 `AppDbContext` 继承即可获得审计、乐观锁与领域事件分发能力。
@@ -14,7 +14,7 @@
 - 新增 PBKDF2 版本化哈希格式与登录透明重哈希。
 
 ### 变更
-- 命名空间由 `TemplateProject.*` 统一改为 `Livia.*`。
+- 命名空间由 `TemplateProject.*` 统一改为 `CloudL.*`。
 - 全局字符串长度约定（默认 256）改为**仅对未显式配置的属性生效**，显式的 `HasMaxLength` 不再被覆盖。
 
 ### 修复

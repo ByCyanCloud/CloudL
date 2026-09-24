@@ -1,4 +1,4 @@
-using Livia.Domain.Repositories;
+using CloudL.Domain.Repositories;
 using TemplateProject.Domain.Entities;
 
 namespace TemplateProject.Domain.Repositories;

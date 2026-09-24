@@ -85,7 +85,7 @@ public class UserEntityTests
         Assert.True(first == second);
     }
 
-    private sealed class SampleEntity : Livia.Domain.Entities.Entity<Guid>
+    private sealed class SampleEntity : CloudL.Domain.Entities.Entity<Guid>
     {
         public SampleEntity(Guid id)
             : base(id)

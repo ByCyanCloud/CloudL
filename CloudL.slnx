@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CloudL.Core/CloudL.Core.csproj" />
+    <Project Path="src/CloudL.EntityFrameworkCore/CloudL.EntityFrameworkCore.csproj" />
+    <Project Path="src/CloudL.AspNetCore/CloudL.AspNetCore.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CloudL.UnitTests/CloudL.UnitTests.csproj" />
+  </Folder>
+</Solution>
