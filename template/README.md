@@ -90,6 +90,18 @@ dotnet nuget add source <框架仓库路径>/local-feed -n cloudl-local
 
 之后 `dotnet restore` 即可从本地源解析 `CloudL.*` 包。
 
+## API 命名约定
+
+框架统一使用 **snake_case**，业务控制器无需额外配置：
+
+| 位置 | 示例 |
+|---|---|
+| JSON 请求体 / 响应体 | `{"user_name":"alice","row_version":"..."}` |
+| Query 参数 | `?page_index=2&page_size=50&sort_by=user_name&sort_direction=asc` |
+| 验证错误键 | `{"errors":{"page_index":["页码必须大于等于 1"]}}` |
+
+query 参数同时兼容 camelCase（`?pageIndex=2`）以便平滑迁移，但推荐统一用 snake_case。
+
 ## 必须修改的配置
 
 上线前请务必处理 `src/TemplateProject.Web/appsettings.json`：

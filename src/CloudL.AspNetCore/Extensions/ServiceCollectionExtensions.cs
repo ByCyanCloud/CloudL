@@ -2,7 +2,9 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using CloudL.AspNetCore.Configuration;
+using CloudL.AspNetCore.HttpApi.Binding;
 using CloudL.AspNetCore.HttpApi.Extensions;
+using CloudL.AspNetCore.HttpApi.Swagger;
 using CloudL.AspNetCore.Infrastructure.Services;
 using CloudL.AspNetCore.Json;
 using CloudL.AspNetCore.Logging;
@@ -69,6 +71,11 @@ public static class ServiceCollectionExtensions
         AddCloudLHttpClients(services, configuration);
         services.AddCloudLJwtAuthentication();
         services.AddCloudLCors(configuration);
+
+        // query 参数同样采用 snake_case（与 JSON 请求/响应体、验证错误键保持一致）；
+        // 同时保留 camelCase 写法，避免破坏既有调用方。
+        services.Configure<MvcOptions>(options =>
+            options.ValueProviderFactories.Insert(0, new SnakeCaseQueryValueProviderFactory()));
 
         return services;
     }
@@ -257,7 +264,8 @@ public static class ServiceCollectionExtensions
                 }
             });
 
-            options.DescribeAllParametersInCamelCase();
+            // query 参数在文档里也显示为 snake_case，保证 Swagger UI 生成的请求可直接使用
+            options.OperationFilter<SnakeCaseQueryParameterOperationFilter>();
 
             foreach (var assembly in (xmlDocumentAssemblies ?? []).Where(a => a is not null).Distinct())
             {
