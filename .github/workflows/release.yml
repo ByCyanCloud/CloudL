@@ -1,6 +1,6 @@
 name: Release
 
-# 打标签即发布：git tag v0.1.0 && git push --tags
+# 打标签即发布：git tag v0.1.0 && git push origin v0.1.0
 # 版本号由 MinVer 依据 tag 计算，因此必须以 v* 形式打标签。
 on:
   push:
@@ -38,7 +38,10 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: 安装 dotnet-ef
-        run: dotnet tool install --global dotnet-ef
+        run: |
+          dotnet tool install --global dotnet-ef
+          # 让后续步骤能在 PATH 上找到 dotnet-ef，否则冒烟测试会静默跳过迁移校验
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
       # ---- 质量门禁：冒烟测试（含打包）不过则不发布 ----
       # smoke-test.ps1 会：打包三个包到 local-feed → 安装模板 → 生成九层项目
@@ -61,12 +64,23 @@ jobs:
       - name: 推送到 nuget.org
         shell: bash
         run: |
-          set -e
-          for file in local-feed/*.nupkg local-feed/*.snupkg; do
-            [ -e "$file" ] || continue
+          set -euo pipefail
+          shopt -s nullglob
+
+          # 关键：显式检查文件数量。否则通配符匹配不到任何文件时循环会被整体跳过，
+          # 导致这一步“绿色通过”却一个包都没发布。
+          files=(local-feed/*.nupkg local-feed/*.snupkg)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::local-feed 中没有任何待发布的包，发布中止"
+            exit 1
+          fi
+
+          for file in "${files[@]}"; do
             echo "==> 推送 $file"
             dotnet nuget push "$file" \
               --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
               --source https://api.nuget.org/v3/index.json \
               --skip-duplicate
           done
+
+          echo "==> 已尝试推送 ${#files[@]} 个文件"
