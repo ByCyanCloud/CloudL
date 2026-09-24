@@ -60,11 +60,17 @@ public static class ServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<LoginProtectionOptions>()
+            .Bind(configuration.GetSection(LoginProtectionOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.TryAddSingleton(TimeProvider.System);
         services.AddHttpContextAccessor();
 
         services.TryAddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.TryAddSingleton<IRefreshTokenStore, InMemoryRefreshTokenStore>();
+        services.TryAddSingleton<ILoginAttemptGuard, InMemoryLoginAttemptGuard>();
         services.TryAddScoped<ICurrentUser, CurrentUser>();
         services.TryAddScoped<IJwtTokenService, JwtTokenService>();
         services.TryAddScoped<IHttpClientService, HttpClientService>();

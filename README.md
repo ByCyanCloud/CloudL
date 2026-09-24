@@ -105,8 +105,13 @@ dotnet package update CloudL.Core@0.1.0
 - 被限流时返回**框架统一响应体**（`status_code = 4290`）并带 `Retry-After` 头，而不是裸 429。
 - **部署前提**：服务在反向代理 / 网关之后时，必须先启用 ForwardedHeaders，
   否则所有请求的 `RemoteIpAddress` 都是代理地址，会让所有人共用一个配额。
-- **用户名维度**做在登录流程内部（失败计数 / 临时锁定）：中间件阶段用户名还在请求体里，
-  强行读取请求体既昂贵又不可靠；而且把 IP 与用户名拼成一个分区键反而更弱 —— 换个用户名就是新配额。
+- **用户名维度**（已实现）：`ILoginAttemptGuard` 在登录流程内做失败计数与临时锁定 ——
+  默认连续 5 次失败锁定 60 秒，锁定期内登录返回 429（业务码 4291）。
+  中间件阶段用户名还在请求体里，强行读取请求体既昂贵又不可靠；
+  而且把 IP 与用户名拼成一个分区键反而更弱 —— 换个用户名就是新配额。
+- 登录保护配置（配置节 `LoginProtection`）：`MaxFailures`（默认 5）、`FailureWindowSeconds`（默认 300）、`LockoutSeconds`（默认 60）。
+- **默认实现是进程内的**：多实例部署时每个实例各算一套计数，实际允许次数会成倍放大，
+  此时应替换为分布式实现（如 Redis），接口不变。
 
 ## 异常与状态码映射
 
@@ -117,6 +122,7 @@ dotnet package update CloudL.Core@0.1.0
 | `ForbiddenBusinessException` | 403 | 默认 4030 |
 | `NotFoundException` | 404 | 默认 4040 |
 | `BusinessConflictException` / `ConcurrencyConflictException` | 409 | 4090 |
+| `TooManyRequestsException` | 429 | 默认 4290；账号锁定用 4291 |
 | `DownstreamServiceException` | 502 | 构造时指定 |
 | `DownstreamTimeoutException` | 504 | 构造时指定 |
 | **其它一切异常**（含 BCL 的 `ArgumentException`、`InvalidOperationException`、`KeyNotFoundException`） | 500 | 5000 |

@@ -122,7 +122,7 @@ public class ExceptionHandlingMiddleware
     private static (HttpStatusCode StatusCode, int BusinessCode, string Message) MapException(Exception exception) =>
         exception switch
         {
-            // 注意：子类必须排在父类之前（Unauthorized / Forbidden / NotFound 都继承 BusinessException）
+            // 注意：子类必须排在父类之前（Unauthorized / Forbidden / NotFound / TooManyRequests 都继承 BusinessException）
             UnauthorizedBusinessException unauthorized => (HttpStatusCode.Unauthorized, unauthorized.BusinessCode, unauthorized.Message),
             ForbiddenBusinessException forbidden => (HttpStatusCode.Forbidden, forbidden.BusinessCode, forbidden.Message),
             NotFoundException notFound => (HttpStatusCode.NotFound, notFound.BusinessCode, notFound.Message),
@@ -133,6 +133,7 @@ public class ExceptionHandlingMiddleware
             DownstreamTimeoutException timeout => (HttpStatusCode.GatewayTimeout, timeout.BusinessCode, timeout.Message),
             DownstreamServiceException downstream => (HttpStatusCode.BadGateway, downstream.BusinessCode, downstream.Message),
 
+            TooManyRequestsException tooManyRequests => (HttpStatusCode.TooManyRequests, tooManyRequests.BusinessCode, tooManyRequests.Message),
             BusinessException business => (HttpStatusCode.BadRequest, business.BusinessCode, business.Message),
 
             // 其余一切（含 BCL 异常）都算服务端错误：不透传消息，避免"把代码缺陷报成调用方错误"并泄露实现细节。

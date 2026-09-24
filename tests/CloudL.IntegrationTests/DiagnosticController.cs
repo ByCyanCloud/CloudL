@@ -1,6 +1,8 @@
 using CloudL.AspNetCore.Extensions;
 using CloudL.AspNetCore.HttpApi.Base;
 using CloudL.AspNetCore.HttpApi.Extensions;
+using CloudL.Application.Contracts.IServices;
+using CloudL.Domain.Shared.Constants;
 using CloudL.Domain.Shared.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +16,14 @@ namespace CloudL.IntegrationTests;
 [AllowAnonymous]
 public class DiagnosticController : BaseApiController
 {
+    private readonly ILoginAttemptGuard _loginAttemptGuard;
+
+    public DiagnosticController(ILoginAttemptGuard loginAttemptGuard)
+    {
+        ArgumentNullException.ThrowIfNull(loginAttemptGuard);
+        _loginAttemptGuard = loginAttemptGuard;
+    }
+
     [HttpGet("echo")]
     public ActionResult<ApiResponse<EchoResult>> Echo(
         [FromQuery] int page_index,
@@ -34,6 +44,26 @@ public class DiagnosticController : BaseApiController
     [HttpGet("denied")]
     public ActionResult<ApiResponse<string>> Denied() =>
         throw new ForbiddenBusinessException("集成测试：权限不足");
+
+    /// <summary>模拟一次登录失败：先检查锁定，再计入失败。</summary>
+    [HttpPost("login-failure")]
+    public ActionResult<ApiResponse<string>> LoginFailure([FromQuery] string user_name)
+    {
+        _loginAttemptGuard.EnsureNotLocked(user_name);
+        _loginAttemptGuard.RecordFailure(user_name);
+
+        throw new UnauthorizedBusinessException(ErrorCodes.CredentialsError, "用户名或密码错误");
+    }
+
+    /// <summary>模拟一次登录成功：应清除失败计数。</summary>
+    [HttpPost("login-success")]
+    public ActionResult<ApiResponse<string>> LoginSuccess([FromQuery] string user_name)
+    {
+        _loginAttemptGuard.EnsureNotLocked(user_name);
+        _loginAttemptGuard.Reset(user_name);
+
+        return OkResponse("ok");
+    }
 
     [HttpGet("limited")]
     [EnableRateLimiting(RateLimitPolicies.Auth)]

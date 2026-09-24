@@ -25,6 +25,7 @@ public class UserService : IUserService
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IRefreshTokenStore _refreshTokenStore;
+    private readonly ILoginAttemptGuard _loginAttemptGuard;
     private readonly ILogger<UserService> _logger;
 
     public UserService(
@@ -34,6 +35,7 @@ public class UserService : IUserService
         IJwtTokenService jwtTokenService,
         IPasswordHasher passwordHasher,
         IRefreshTokenStore refreshTokenStore,
+        ILoginAttemptGuard loginAttemptGuard,
         ILogger<UserService> logger)
     {
         _userRepository = userRepository;
@@ -42,6 +44,7 @@ public class UserService : IUserService
         _jwtTokenService = jwtTokenService;
         _passwordHasher = passwordHasher;
         _refreshTokenStore = refreshTokenStore;
+        _loginAttemptGuard = loginAttemptGuard;
         _logger = logger;
     }
 
@@ -154,6 +157,9 @@ public class UserService : IUserService
         LoginDto input,
         CancellationToken cancellationToken = default)
     {
+        // 账号维度：锁定期内直接拒绝，连数据库都不必查
+        _loginAttemptGuard.EnsureNotLocked(input.UserName);
+
         var user = await _userRepository
             .FindByUserNameWithRolesAsync(input.UserName, cancellationToken)
             .ConfigureAwait(false);
@@ -161,6 +167,7 @@ public class UserService : IUserService
         // 用户不存在与密码错误返回同一提示，避免暴露账号是否存在
         if (user is null || !_passwordHasher.Verify(input.Password, user.PasswordHash))
         {
+            _loginAttemptGuard.RecordFailure(input.UserName);
             _logger.LogWarning("登录失败: {UserName}", input.UserName);
             throw new UnauthorizedBusinessException(ErrorCodes.CredentialsError, "用户名或密码错误");
         }
@@ -183,6 +190,8 @@ public class UserService : IUserService
                 user = await _userRepository.GetByIdWithRolesAsync(user.Id, cancellationToken).ConfigureAwait(false) ?? user;
             }
         }
+
+        _loginAttemptGuard.Reset(input.UserName);
 
         return await IssueTokensAsync(user, cancellationToken).ConfigureAwait(false);
     }
