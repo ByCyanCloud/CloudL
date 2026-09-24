@@ -1,0 +1,72 @@
+name: Release
+
+# 打标签即发布：git tag v0.1.0 && git push --tags
+# 版本号由 MinVer 依据 tag 计算，因此必须以 v* 形式打标签。
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  release:
+    name: 校验并发布到 nuget.org
+    runs-on: ubuntu-latest
+
+    # Trusted Publishing 需要 GitHub OIDC token
+    permissions:
+      contents: read
+      id-token: write
+
+    # 若在 nuget.org 的 Trusted Publishing 策略里填了 Environment，
+    # 请取消下面这行的注释，并保证名称与策略中完全一致。
+    # environment: production
+
+    steps:
+      - name: 检出（需要完整历史与 tag 供 MinVer 计算版本）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 安装 dotnet-ef
+        run: dotnet tool install --global dotnet-ef
+
+      # ---- 质量门禁：冒烟测试（含打包）不过则不发布 ----
+      # smoke-test.ps1 会：打包三个包到 local-feed → 安装模板 → 生成九层项目
+      #                  → 编译 → 跑测试 → 生成迁移 → 校验迁移与模型一致
+      - name: 冒烟测试（含打包到 local-feed）
+        run: pwsh ./build/smoke-test.ps1
+
+      - name: 列出待发布的包
+        run: ls -l local-feed/*.nupkg
+
+      # ---- 用 OIDC token 换取临时 API Key ----
+      # 临时 Key 仅 1 小时有效、且一个 token 只能换一次，必须紧邻 push 执行。
+      - name: NuGet 登录（OIDC → 临时 API Key）
+        uses: NuGet/login@v1
+        id: login
+        with:
+          # nuget.org 的用户名（profile name），不是邮箱；请在仓库 Secrets 中配置
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: 推送到 nuget.org
+        shell: bash
+        run: |
+          set -e
+          for file in local-feed/*.nupkg local-feed/*.snupkg; do
+            [ -e "$file" ] || continue
+            echo "==> 推送 $file"
+            dotnet nuget push "$file" \
+              --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
