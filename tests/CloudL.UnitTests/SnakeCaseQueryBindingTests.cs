@@ -72,7 +72,11 @@ public class SnakeCaseQueryBindingTests
 
         var values = SnakeCaseQueryKey.Build(query);
 
-        Assert.Equal(new[] { "1", "2", "3" }, values["UserIds"]);
+        var userIds = values["UserIds"];
+        Assert.Equal(3, userIds.Count);
+        Assert.Equal("1", userIds[0]);
+        Assert.Equal("2", userIds[1]);
+        Assert.Equal("3", userIds[2]);
     }
 
     [Fact]
