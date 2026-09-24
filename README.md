@@ -11,6 +11,33 @@
 | `CloudL.EntityFrameworkCore` | `FrameworkDbContext`（审计/乐观锁/领域事件）、`EfCoreRepository<,>`、`EfCoreUnitOfWork`、实体配置基类、`AddFrameworkDbContext<TContext>()` |
 | `CloudL.AspNetCore` | 统一响应 `ApiResponse`、全局异常中间件、模型验证过滤器、JWT/CORS/Swagger 集成、当前用户上下文、PBKDF2 密码哈希、HTTP 客户端封装、`AddFramework()` |
 
+## 架构概览
+
+框架 = **5 个 NuGet 包** + **9 层业务骨架**（由 `dotnet new cloudl` 生成）：
+
+```
+业务项目
+├── Web                 只做装配与管道（Program.cs）
+├── HttpApi             控制器（统一响应 / 异常 / 验证由框架接管）
+├── Application         用例编排
+├── Application.Contracts
+├── Domain              实体、领域事件、仓储接口（不依赖任何基础设施）
+├── Domain.Shared
+├── EntityFrameworkCore AppDbContext + 实体配置 + 迁移
+├── Infrastructure
+└── DbMigrator          建库 + 种子数据
+          │
+          └─ 依赖框架包：CloudL.Core
+                         CloudL.AspNetCore
+                         CloudL.EntityFrameworkCore
+                         CloudL.EntityFrameworkCore.PostgreSql（或 .SqlServer）
+```
+
+依赖方向始终单向：`Web → HttpApi → Application → Domain`；
+基础设施层只实现 Domain 定义的接口，由 Web 在启动时装配。
+框架包同样保持这个方向：`CloudL.Core` 不依赖其它包，`CloudL.AspNetCore` 与
+`CloudL.EntityFrameworkCore` 都只依赖 `CloudL.Core`。
+
 ## 业务项目快速开始
 
 ```powershell
