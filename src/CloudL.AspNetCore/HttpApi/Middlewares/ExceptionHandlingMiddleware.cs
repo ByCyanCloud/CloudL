@@ -12,7 +12,10 @@ namespace CloudL.AspNetCore.HttpApi.Middlewares;
 
 /// <summary>
 /// 全局异常处理中间件：把异常转换为统一的 <see cref="ApiResponse{T}"/>。
-/// <para>安全约定：请求体与 Authorization 头在写日志前一律脱敏；堆栈仅在开发环境返回。</para>
+/// <para><strong>安全约定</strong>：只有框架定义的业务异常才把消息透传给调用方；
+/// 其余异常（含 BCL 的 <c>ArgumentException</c>/<c>InvalidOperationException</c>/<c>KeyNotFoundException</c>）
+/// 一律返回通用消息 —— 它们几乎都是代码缺陷而不是调用方输入问题。</para>
+/// <para>请求体与 Authorization 头在写日志前一律脱敏；堆栈仅在开发环境、且仅对 5xx 返回。</para>
 /// </summary>
 public class ExceptionHandlingMiddleware
 {
@@ -83,52 +86,46 @@ public class ExceptionHandlingMiddleware
         context.Response.StatusCode = (int)statusCode;
         await context.Response.WriteAsync(CloudLJson.Serialize(response)).ConfigureAwait(false);
 
-        WriteLog(context, exception, response, requestBody);
+        WriteLog(context, exception, response, requestBody, statusCode);
     }
 
     private void WriteLog(
         HttpContext context,
         Exception exception,
         ApiResponse<object> response,
-        string requestBody)
+        string requestBody,
+        HttpStatusCode statusCode)
     {
         var authHeader = SensitiveDataRedactor.RedactAuthorizationHeader(
             context.Request.Headers.Authorization.ToString());
 
-        if (IsExpectedException(exception))
+        // 日志级别直接由映射出的状态码决定：5xx 是服务端问题（Error），4xx 是预期内的业务问题（Warning）。
+        // 用状态码判断，而不是再维护一份"预期异常清单"，避免两处规则随时间不一致。
+        if (statusCode >= HttpStatusCode.InternalServerError)
         {
-            _logger.LogWarning(
-                "\n业务异常\n[Response]\nstatusCode={StatusCode}, errorId={ErrorId}, message={Message}\n[Request]\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n[Body]\n{Body}",
+            _logger.LogError(
+                exception,
+                "\n未处理的异常\n[Response]\nstatusCode={StatusCode}, errorId={ErrorId}, message={Message}\n[Request]\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n[Body]\n{Body}",
                 response.StatusCode, response.ErrorId, response.Message,
                 context.Request.Method, context.Request.Path, context.Request.QueryString,
                 authHeader, requestBody);
             return;
         }
 
-        _logger.LogError(
-            exception,
-            "\n未处理的异常\n[Response]\nstatusCode={StatusCode}, errorId={ErrorId}, message={Message}\n[Request]\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n[Body]\n{Body}",
+        _logger.LogWarning(
+            "\n业务异常\n[Response]\nstatusCode={StatusCode}, errorId={ErrorId}, message={Message}\n[Request]\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n[Body]\n{Body}",
             response.StatusCode, response.ErrorId, response.Message,
             context.Request.Method, context.Request.Path, context.Request.QueryString,
             authHeader, requestBody);
     }
 
-    private static bool IsExpectedException(Exception exception) =>
-        exception is BusinessException
-            or BusinessConflictException
-            or ConcurrencyConflictException
-            or DownstreamServiceException
-            or ArgumentException
-            or UnauthorizedAccessException
-            or KeyNotFoundException
-            or InvalidOperationException;
-
     private static (HttpStatusCode StatusCode, int BusinessCode, string Message) MapException(Exception exception) =>
         exception switch
         {
-            // 注意：UnauthorizedBusinessException 继承 BusinessException，必须排在前面
+            // 注意：子类必须排在父类之前（Unauthorized / Forbidden / NotFound 都继承 BusinessException）
             UnauthorizedBusinessException unauthorized => (HttpStatusCode.Unauthorized, unauthorized.BusinessCode, unauthorized.Message),
-            BusinessException business => (HttpStatusCode.BadRequest, business.BusinessCode, business.Message),
+            ForbiddenBusinessException forbidden => (HttpStatusCode.Forbidden, forbidden.BusinessCode, forbidden.Message),
+            NotFoundException notFound => (HttpStatusCode.NotFound, notFound.BusinessCode, notFound.Message),
             BusinessConflictException conflict => (HttpStatusCode.Conflict, ErrorCodes.Conflict, conflict.Message),
             ConcurrencyConflictException concurrency => (HttpStatusCode.Conflict, ErrorCodes.Conflict, concurrency.Message),
 
@@ -136,10 +133,9 @@ public class ExceptionHandlingMiddleware
             DownstreamTimeoutException timeout => (HttpStatusCode.GatewayTimeout, timeout.BusinessCode, timeout.Message),
             DownstreamServiceException downstream => (HttpStatusCode.BadGateway, downstream.BusinessCode, downstream.Message),
 
-            ArgumentException argument => (HttpStatusCode.BadRequest, ErrorCodes.ValidationError, argument.Message),
-            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, ErrorCodes.Unauthorized, "未授权访问"),
-            KeyNotFoundException notFound => (HttpStatusCode.NotFound, ErrorCodes.NotFound, notFound.Message),
-            InvalidOperationException invalid => (HttpStatusCode.BadRequest, ErrorCodes.ValidationError, invalid.Message),
+            BusinessException business => (HttpStatusCode.BadRequest, business.BusinessCode, business.Message),
+
+            // 其余一切（含 BCL 异常）都算服务端错误：不透传消息，避免"把代码缺陷报成调用方错误"并泄露实现细节。
             _ => (HttpStatusCode.InternalServerError, ErrorCodes.ServerError, "服务器内部错误")
         };
 }

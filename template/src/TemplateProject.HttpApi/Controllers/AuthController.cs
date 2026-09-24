@@ -2,6 +2,7 @@ using CloudL.AspNetCore.HttpApi.Base;
 using CloudL.AspNetCore.HttpApi.Extensions;
 using CloudL.Application.Contracts.IServices;
 using CloudL.Domain.Shared.Constants;
+using Microsoft.AspNetCore.RateLimiting;
 using TemplateProject.Application.Contracts.Dtos;
 using TemplateProject.Application.Contracts.IServices;
 
@@ -13,6 +14,7 @@ namespace TemplateProject.HttpApi.Controllers;
 [ApiController]
 [Route("api/auth")]
 [Produces("application/json")]
+[EnableRateLimiting(RateLimitPolicies.Auth)]
 public class AuthController : BaseApiController
 {
     private readonly IUserService _userService;

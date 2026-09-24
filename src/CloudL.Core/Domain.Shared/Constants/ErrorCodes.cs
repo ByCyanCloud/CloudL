@@ -30,6 +30,12 @@ public static class ErrorCodes
     /// <summary>资源状态冲突 / 并发冲突（HTTP 409）。</summary>
     public const int Conflict = 4090;
 
+    /// <summary>请求过于频繁，被限流（HTTP 429）。</summary>
+    public const int TooManyRequests = 4290;
+
+    /// <summary>账号已被临时锁定（HTTP 429）：连续登录失败次数过多。</summary>
+    public const int AccountLocked = 4291;
+
     /// <summary>服务器内部错误（HTTP 500）。</summary>
     public const int ServerError = 5000;
 

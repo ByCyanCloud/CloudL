@@ -92,6 +92,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors(CorsOptions.DefaultPolicyName);
+
+// 限流：配额与窗口见配置节 RateLimits；放在 CORS 之后，避免浏览器预检请求被限流
+// 注意：部署在反向代理之后时必须先启用 ForwardedHeaders，否则所有请求的 IP 都是代理地址
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

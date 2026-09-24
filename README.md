@@ -94,3 +94,33 @@ dotnet package update CloudL.Core@0.1.0
   块状日志以空行开头，便于在日志文件中区分不同日志段。
 - **脱敏两层策略**：按键名（忽略大小写与 `_`/`-`，因此 `access_token`、`api-key`、`client_secret` 均命中）
   与按值的形态（JWT、≥40 位不透明令牌），键名起成 `ticket` 也遮得住。
+
+## 限流
+
+- **IP 维度**（已实现）：`AddCloudLRateLimiting` 由 `AddCloudLAspNetCore` 自动注册；
+  管道里加 `app.UseRateLimiter()`（放在 `UseCors` 之后、`UseRouting` 之后），
+  控制器上用 `[EnableRateLimiting(RateLimitPolicies.Auth)]` 为认证类接口开启配额。
+- 配置：`RateLimits:Auth:PermitLimit`（默认 10）、`RateLimits:Auth:WindowSeconds`（默认 60）、
+  `RateLimits:Auth:QueueLimit`（默认 0，即立即拒绝）。
+- 被限流时返回**框架统一响应体**（`status_code = 4290`）并带 `Retry-After` 头，而不是裸 429。
+- **部署前提**：服务在反向代理 / 网关之后时，必须先启用 ForwardedHeaders，
+  否则所有请求的 `RemoteIpAddress` 都是代理地址，会让所有人共用一个配额。
+- **用户名维度**做在登录流程内部（失败计数 / 临时锁定）：中间件阶段用户名还在请求体里，
+  强行读取请求体既昂贵又不可靠；而且把 IP 与用户名拼成一个分区键反而更弱 —— 换个用户名就是新配额。
+
+## 异常与状态码映射
+
+| 异常类型 | HTTP | 业务码 |
+|---|---|---|
+| `BusinessException` | 400 | 构造时指定 |
+| `UnauthorizedBusinessException` | 401 | 构造时指定 |
+| `ForbiddenBusinessException` | 403 | 默认 4030 |
+| `NotFoundException` | 404 | 默认 4040 |
+| `BusinessConflictException` / `ConcurrencyConflictException` | 409 | 4090 |
+| `DownstreamServiceException` | 502 | 构造时指定 |
+| `DownstreamTimeoutException` | 504 | 构造时指定 |
+| **其它一切异常**（含 BCL 的 `ArgumentException`、`InvalidOperationException`、`KeyNotFoundException`） | 500 | 5000 |
+
+- 只有框架定义的业务异常会把异常消息透传给调用方；其余异常统一返回「服务器内部错误」并附带 `error_id`（便于对照日志排查）。
+- 日志级别由映射出的状态码决定：5xx 记 Error（含堆栈），4xx 记 Warning —— 规则只有一处，不会随时间跑偏。
+- 开发环境下 5xx 响应会附带 `error_detail`（堆栈）；生产环境不返回。请求体与 Authorization 头在写日志前一律脱敏。

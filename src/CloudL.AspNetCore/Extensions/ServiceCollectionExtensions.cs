@@ -72,6 +72,7 @@ public static class ServiceCollectionExtensions
         AddCloudLHttpClients(services, configuration);
         services.AddCloudLJwtAuthentication();
         services.AddCloudLCors(configuration);
+        services.AddCloudLRateLimiting(configuration);
 
         // query 参数同样采用 snake_case（与 JSON 请求/响应体、验证错误键保持一致）；
         // 同时保留 camelCase 写法，避免破坏既有调用方。

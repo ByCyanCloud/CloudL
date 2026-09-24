@@ -113,7 +113,7 @@ public class UserService : IUserService
         CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false)
-            ?? throw new KeyNotFoundException("用户不存在");
+            ?? throw new NotFoundException("用户不存在");
 
         if (user.RowVersion != input.RowVersion)
         {
@@ -141,7 +141,7 @@ public class UserService : IUserService
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false)
-            ?? throw new KeyNotFoundException("用户不存在");
+            ?? throw new NotFoundException("用户不存在");
 
         await _userRepository.DeleteAsync(user, cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -167,7 +167,7 @@ public class UserService : IUserService
 
         if (user.Status != UserStatus.Active)
         {
-            throw new UnauthorizedBusinessException(ErrorCodes.Forbidden, "账号不可用，请联系管理员");
+            throw new ForbiddenBusinessException("账号不可用，请联系管理员");
         }
 
         // 哈希参数偏弱时透明升级（例如框架提升了 PBKDF2 迭代次数）
@@ -200,7 +200,7 @@ public class UserService : IUserService
 
         if (user.Status != UserStatus.Active)
         {
-            throw new UnauthorizedBusinessException(ErrorCodes.Forbidden, "账号不可用，请联系管理员");
+            throw new ForbiddenBusinessException("账号不可用，请联系管理员");
         }
 
         return await IssueTokensAsync(user, cancellationToken).ConfigureAwait(false);
@@ -217,7 +217,7 @@ public class UserService : IUserService
         CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false)
-            ?? throw new KeyNotFoundException("用户不存在");
+            ?? throw new NotFoundException("用户不存在");
 
         if (!_passwordHasher.Verify(input.CurrentPassword, user.PasswordHash))
         {
@@ -300,7 +300,7 @@ public class UserService : IUserService
     private async Task<UserDto> ReloadAsDtoAsync(Guid userId, CancellationToken cancellationToken)
     {
         var reloaded = await _userRepository.GetByIdWithRolesAsync(userId, cancellationToken).ConfigureAwait(false)
-            ?? throw new KeyNotFoundException("用户不存在");
+            ?? throw new NotFoundException("用户不存在");
 
         return reloaded.Adapt<UserDto>();
     }
