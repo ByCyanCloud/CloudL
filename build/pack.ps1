@@ -99,6 +99,8 @@ if ($previewPackages) {
 $projects = @(
     'src/CloudL.Core/CloudL.Core.csproj',
     'src/CloudL.EntityFrameworkCore/CloudL.EntityFrameworkCore.csproj',
+    'src/CloudL.EntityFrameworkCore.PostgreSql/CloudL.EntityFrameworkCore.PostgreSql.csproj',
+    'src/CloudL.EntityFrameworkCore.SqlServer/CloudL.EntityFrameworkCore.SqlServer.csproj',
     'src/CloudL.AspNetCore/CloudL.AspNetCore.csproj'
 )
 

@@ -137,3 +137,18 @@ dotnet run --project src/TemplateProject.DbMigrator
 
 如需让 `dotnet ef` 通过 Web 主机的依赖注入来构造 `DbContext`，请给 Web 项目也加上
 `Microsoft.EntityFrameworkCore.Design`，并追加 `--startup-project src/TemplateProject.Web`。
+
+## 换数据库（PostgreSQL / SQL Server）
+
+框架把数据库提供程序拆成了独立包，**核心包与数据库无关**。本模板默认 PostgreSQL：
+
+| 位置 | PostgreSQL（默认） | SQL Server |
+|---|---|---|
+| 1. 包引用 | `CloudL.EntityFrameworkCore.PostgreSql` | `CloudL.EntityFrameworkCore.SqlServer` |
+| 2. 运行时装配 | `options.UseCloudLPostgreSql(connectionString)` | `options.UseCloudLSqlServer(connectionString)` |
+| 3. 设计时工厂 | 同上 | 同上 |
+
+- 包引用在 `src/<项目>.EntityFrameworkCore/<项目>.EntityFrameworkCore.csproj`；
+- 装配位置：`ProjectEntityFrameworkCoreModule` 与 `Data/DesignTimeDbContextFactory`（各一行）；
+- 连接串都是 `ConnectionStrings:Default`，两种数据库共用。
+- 不同数据库提供程序生成的迁移**不通用**：换库后请删掉 `Migrations` 目录并重新生成初始迁移。

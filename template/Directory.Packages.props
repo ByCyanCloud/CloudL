@@ -11,7 +11,7 @@
     <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
 
     <!--
-      CloudL 框架包版本：三个包锁步同版本。
+      CloudL 框架包版本：所有包锁步同版本。
       升级框架只需改这一处（或执行 dotnet package update），无需改动任何业务代码。
       用模板生成时可通过 frameworkVersion 参数指定版本，具体命令见本模板 README 的「框架升级」章节。
       注意：XML 注释中不能出现连续两个减号，因此此处不写完整命令行示例。
@@ -23,6 +23,10 @@
     <PackageVersion Include="CloudL.Core" Version="$(CloudLVersion)" />
     <PackageVersion Include="CloudL.EntityFrameworkCore" Version="$(CloudLVersion)" />
     <PackageVersion Include="CloudL.AspNetCore" Version="$(CloudLVersion)" />
+
+    <!-- 数据库提供程序：项目实际引用哪一个，见 TemplateProject.EntityFrameworkCore.csproj -->
+    <PackageVersion Include="CloudL.EntityFrameworkCore.PostgreSql" Version="$(CloudLVersion)" />
+    <PackageVersion Include="CloudL.EntityFrameworkCore.SqlServer" Version="$(CloudLVersion)" />
   </ItemGroup>
 
   <ItemGroup Label="应用与持久化">

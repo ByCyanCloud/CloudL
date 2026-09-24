@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <AssemblyName>CloudL.EntityFrameworkCore.SqlServer</AssemblyName>
+    <RootNamespace>CloudL</RootNamespace>
+    <PackageId>CloudL.EntityFrameworkCore.SqlServer</PackageId>
+    <Title>CloudL EntityFrameworkCore SqlServer</Title>
+    <Description>CloudL DDD 框架的 SQL Server 数据库提供程序：为 DbContextOptionsBuilder 提供 UseCloudLSqlServer。</Description>
+    <PackageTags>ddd;entity-framework-core;sqlserver;framework;cloudl</PackageTags>
+
+    <!--
+      本包在 0.1.0 时还不存在，因此没有可比的已发布基线。
+      0.2.0 发布之后请删除下面这一行，让它继承 Directory.Build.props 里的基线版本，
+      这样它的公开 API 也会受兼容性守卫约束。
+    -->
+    <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+  </ItemGroup>
+
+</Project>

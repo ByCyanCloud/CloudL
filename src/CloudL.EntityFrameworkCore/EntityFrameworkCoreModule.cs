@@ -1,8 +1,6 @@
 using CloudL.Domain.Repositories;
-using CloudL.EntityFrameworkCore.Extensions;
 using CloudL.EntityFrameworkCore.Repositories;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CloudL.EntityFrameworkCore;
@@ -13,41 +11,33 @@ namespace CloudL.EntityFrameworkCore;
 public static class EntityFrameworkCoreModule
 {
     /// <summary>
-    /// 按配置注册 DbContext 与仓储。
-    /// 读取 <c>ConnectionStrings:Default</c> 与 <c>Database:Provider</c>（默认 postgresql）。
+    /// 注册 DbContext（审计 / 乐观锁 / 领域事件）、通用仓储与工作单元。
     /// </summary>
+    /// <remarks>
+    /// <para>数据库提供程序由调用方显式指定，因此核心包<strong>不依赖任何具体数据库</strong>，
+    /// 消费方也不会被拖入用不到的提供程序依赖：</para>
+    /// <code>
+    /// // PostgreSQL：引用 CloudL.EntityFrameworkCore.PostgreSql 包
+    /// services.AddCloudLEntityFrameworkCore&lt;AppDbContext&gt;(options =&gt;
+    ///     options.UseCloudLPostgreSql(configuration.GetRequiredConnectionString()));
+    ///
+    /// // SQL Server：引用 CloudL.EntityFrameworkCore.SqlServer 包
+    /// services.AddCloudLEntityFrameworkCore&lt;AppDbContext&gt;(options =&gt;
+    ///     options.UseCloudLSqlServer(configuration.GetRequiredConnectionString()));
+    /// </code>
+    /// </remarks>
     /// <typeparam name="TContext">业务 DbContext 类型。</typeparam>
+    /// <param name="services">服务集合。</param>
+    /// <param name="configureDatabase">数据库提供程序与连接串的配置委托。</param>
     public static IServiceCollection AddCloudLEntityFrameworkCore<TContext>(
         this IServiceCollection services,
-        IConfiguration configuration)
+        Action<DbContextOptionsBuilder> configureDatabase)
         where TContext : FrameworkDbContext
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(configureDatabase);
 
-        var connectionString = configuration.GetConnectionString("Default")
-            ?? throw new InvalidOperationException("未配置数据库连接串：ConnectionStrings:Default");
-
-        var provider = configuration.GetValue<string>("Database:Provider")
-            ?? DbContextOptionsExtensions.PostgreSqlProvider;
-
-        return services.AddCloudLEntityFrameworkCore<TContext>(connectionString, provider);
-    }
-
-    /// <summary>
-    /// 按连接串与提供程序注册 DbContext 与仓储。
-    /// </summary>
-    /// <typeparam name="TContext">业务 DbContext 类型。</typeparam>
-    public static IServiceCollection AddCloudLEntityFrameworkCore<TContext>(
-        this IServiceCollection services,
-        string connectionString,
-        string provider)
-        where TContext : FrameworkDbContext
-    {
-        ArgumentNullException.ThrowIfNull(services);
-
-        services.AddDbContext<TContext>(options =>
-            options.UseCloudLDatabaseProvider(connectionString, provider));
+        services.AddDbContext<TContext>((_, options) => configureDatabase(options));
 
         // 让基类可被注入：仓储与工作单元只依赖 FrameworkDbContext，而不耦合具体业务 Context
         services.AddScoped<FrameworkDbContext>(serviceProvider =>

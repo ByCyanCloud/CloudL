@@ -7,6 +7,15 @@
   <ItemGroup>
     <PackageReference Include="CloudL.Core" />
     <PackageReference Include="CloudL.EntityFrameworkCore" />
+
+    <!--
+      数据库提供程序：按项目实际使用的数据库二选一。
+      换 SQL Server 时把下面这个包换成 CloudL.EntityFrameworkCore.SqlServer，
+      并把 ProjectEntityFrameworkCoreModule / DesignTimeDbContextFactory 里的
+      UseCloudLPostgreSql 改成 UseCloudLSqlServer（各一行）。
+    -->
+    <PackageReference Include="CloudL.EntityFrameworkCore.PostgreSql" />
+
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>

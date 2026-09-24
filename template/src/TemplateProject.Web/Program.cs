@@ -74,12 +74,9 @@ builder.Services.AddCloudLSwagger(
 // ============================================================
 var app = builder.Build();
 
-// 启用请求体缓冲，使过滤器/中间件可以多次读取请求体（日志与诊断需要）
-app.Use(async (context, next) =>
-{
-    context.Request.EnableBuffering();
-    await next(context);
-});
+// 请求体缓冲：只为"需要事后回读请求体"的请求启用（非 multipart 且体积可控），
+// 避免为文件上传额外落一份临时文件
+app.UseCloudLRequestBodyBuffering();
 
 // 请求日志：每个请求一条摘要（query 中的敏感参数自动脱敏）；/health、/swagger 降级为 Verbose
 app.UseCloudLRequestLogging();

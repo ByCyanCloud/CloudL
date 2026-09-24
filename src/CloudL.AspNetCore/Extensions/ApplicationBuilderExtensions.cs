@@ -14,6 +14,37 @@ public static class ApplicationBuilderExtensions
     /// <summary>这些路径的请求日志降级为 Verbose，避免健康检查与接口文档淹没业务日志。</summary>
     private static readonly string[] NoisePaths = ["/health", "/swagger", "/favicon.ico"];
 
+    /// <summary>超过该大小的请求体不做缓冲。</summary>
+    private const long MaxBufferedBodySize = 64 * 1024;
+
+    /// <summary>
+    /// 只为"需要事后回读请求体"的请求启用请求体缓冲：<strong>非 multipart 且体积可控</strong>。
+    /// </summary>
+    /// <remarks>
+    /// <para>为什么不能无条件调用 <c>Request.EnableBuffering()</c>：它会把请求体换成缓冲流
+    /// （默认 30KB 以内驻留内存，超出则落<strong>临时文件</strong>）。对文件上传而言，MVC 读 multipart
+    /// 时本来就会把文件写到自己的临时文件，缓冲流会再写一份 —— 双倍磁盘 I/O；
+    /// 容器里 <c>/tmp</c> 挂 tmpfs 且容量小时，大文件上传甚至会把 <c>/tmp</c> 写满。</para>
+    /// <para>被跳过的请求（multipart 或超大体积）在异常/验证失败日志里会显示空请求体 —— 这是刻意的取舍。</para>
+    /// </remarks>
+    public static IApplicationBuilder UseCloudLRequestBodyBuffering(this IApplicationBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        return app.Use(async (context, next) =>
+        {
+            var isMultipart = context.Request.ContentType?.StartsWith("multipart/", StringComparison.OrdinalIgnoreCase) == true;
+            var isTooLarge = context.Request.ContentLength > MaxBufferedBodySize;
+
+            if (!isMultipart && !isTooLarge)
+            {
+                context.Request.EnableBuffering();
+            }
+
+            await next(context).ConfigureAwait(false);
+        });
+    }
+
     /// <summary>
     /// 启用请求日志：每个请求输出一条结构化摘要
     /// （方法、路径、脱敏后的 query、状态码、耗时、TraceId、客户端 IP、用户名）。

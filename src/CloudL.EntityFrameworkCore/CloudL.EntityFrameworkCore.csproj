@@ -6,16 +6,19 @@
     <RootNamespace>CloudL</RootNamespace>
     <PackageId>CloudL.EntityFrameworkCore</PackageId>
     <Title>CloudL EntityFrameworkCore</Title>
-    <Description>CloudL DDD 框架 EF Core 持久化层：FrameworkDbContext、仓储实现、实体配置基类与泛型注册扩展。</Description>
+    <Description>CloudL DDD 框架 EF Core 持久化层（与数据库无关）：FrameworkDbContext、仓储实现、工作单元与实体配置基类。数据库提供程序请另引用 CloudL.EntityFrameworkCore.PostgreSql 或 CloudL.EntityFrameworkCore.SqlServer。</Description>
     <PackageTags>ddd;entity-framework-core;framework;cloudl</PackageTags>
   </PropertyGroup>
 
+  <!--
+    刻意不引用任何数据库提供程序：核心包与数据库无关，因此消费方不会被拖入用不到的
+    Microsoft.Data.SqlClient / Npgsql 及其原生依赖（体积、安全面、还原时间都会受影响）。
+    提供程序由 CloudL.EntityFrameworkCore.PostgreSql / .SqlServer 两个包提供。
+  -->
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
 

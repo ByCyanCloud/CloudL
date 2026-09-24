@@ -40,9 +40,7 @@ try
     await using var scope = host.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    var provider = host.Services.GetRequiredService<IConfiguration>()
-        .GetValue<string>("Database:Provider") ?? "postgresql";
-    Log.Information("数据库提供程序: {Provider}", provider);
+    Log.Information("数据库提供程序: {Provider}", dbContext.Database.ProviderName);
 
     // ---------- 迁移 ----------
     var pendingMigrations = (await dbContext.Database.GetPendingMigrationsAsync()).ToList();

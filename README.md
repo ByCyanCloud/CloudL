@@ -170,3 +170,21 @@ await _unitOfWork.ExecuteInTransactionAsync(async ct =>
 - **每次发布后要更新基线版本**，否则新版本的破坏又会去和旧基线比对。
 - 它管不到**行为变更**（例如 camelCase 参数开始返回 400、响应字典键不再改写、异常映射收敛）——
   那类变更靠 CHANGELOG 的迁移影响说明与集成测试来兜。
+
+## 数据库提供程序
+
+| 包 | 说明 |
+|---|---|
+| `CloudL.EntityFrameworkCore` | 持久化核心，**与数据库无关**（不含任何 provider 依赖） |
+| `CloudL.EntityFrameworkCore.PostgreSql` | `options.UseCloudLPostgreSql(connectionString)` |
+| `CloudL.EntityFrameworkCore.SqlServer` | `options.UseCloudLSqlServer(connectionString)` |
+
+```csharp
+services.AddCloudLEntityFrameworkCore<AppDbContext>(options =>
+    options.UseCloudLPostgreSql(configuration.GetRequiredConnectionString()));
+```
+
+- 核心包刻意不引用任何 provider：否则每个消费方都会被拖入用不到的 `Microsoft.Data.SqlClient` / `Npgsql`
+  （实测多余程序集约 1.5 MB，还多一份安全面与还原时间）。
+- 提供程序在**代码里显式选择**，而不是靠配置里的名字字符串 —— 用错会在编译期暴露，而不是运行期。
+- `GetRequiredConnectionString()` 在连接串缺失或为空白时给出明确的配置路径，而不是等到第一次访问数据库。

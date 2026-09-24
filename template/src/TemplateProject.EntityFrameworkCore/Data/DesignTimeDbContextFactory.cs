@@ -7,12 +7,14 @@ namespace TemplateProject.EntityFrameworkCore;
 
 /// <summary>
 /// EF Core 设计时工厂，供 <c>dotnet ef</c> 命令使用。
-/// 它从 Web 项目的 appsettings 中读取连接串与数据库提供程序，保证与运行时一致。
+/// 它从 Web 项目的 appsettings 中读取连接串，并复用与运行时相同的提供程序配置，
+/// 保证迁移生成的结果与实际运行一致。
 /// </summary>
 /// <remarks>
 /// 迁移属于各业务项目，因此模板<strong>不预置迁移</strong>，首次使用请执行：
 /// <code>dotnet ef migrations add InitialCreate --project src/TemplateProject.EntityFrameworkCore --startup-project src/TemplateProject.Web</code>
 /// 本工厂会依次尝试多个候选路径来定位 Web 项目，因此<strong>不依赖当前工作目录</strong>。
+/// 换数据库时，请把下面的 <c>UseCloudLPostgreSql</c> 与项目引用一起改掉（与运行时保持一致）。
 /// </remarks>
 public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
@@ -29,14 +31,10 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
             .AddJsonFile("appsettings.Development.json", optional: true)
             .Build();
 
-        var connectionString = configuration.GetConnectionString("Default")
-            ?? throw new InvalidOperationException("未配置数据库连接串：ConnectionStrings:Default");
-
-        var provider = configuration.GetValue<string>("Database:Provider")
-            ?? DbContextOptionsExtensions.PostgreSqlProvider;
+        var connectionString = configuration.GetRequiredConnectionString();
 
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseCloudLDatabaseProvider(connectionString, provider);
+        optionsBuilder.UseCloudLPostgreSql(connectionString);
 
         return new AppDbContext(optionsBuilder.Options);
     }
