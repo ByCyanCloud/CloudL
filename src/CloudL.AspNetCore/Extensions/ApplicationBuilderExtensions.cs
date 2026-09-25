@@ -33,10 +33,14 @@ public static class ApplicationBuilderExtensions
 
         return app.Use(async (context, next) =>
         {
+            var contentLength = context.Request.ContentLength;
             var isMultipart = context.Request.ContentType?.StartsWith("multipart/", StringComparison.OrdinalIgnoreCase) == true;
-            var isTooLarge = context.Request.ContentLength > MaxBufferedBodySize;
 
-            if (!isMultipart && !isTooLarge)
+            // 分块传输（ContentLength 为 null）无法预判大小，同样不缓冲 —— 否则收窄就落空了
+            var isUnknownSize = contentLength is null;
+            var isTooLarge = contentLength > MaxBufferedBodySize;
+
+            if (!isMultipart && !isUnknownSize && !isTooLarge)
             {
                 context.Request.EnableBuffering();
             }

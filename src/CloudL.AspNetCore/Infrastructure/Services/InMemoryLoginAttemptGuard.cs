@@ -13,23 +13,20 @@ namespace CloudL.AspNetCore.Infrastructure.Services;
 /// </summary>
 /// <remarks>
 /// <strong>限制（务必知晓）</strong>：状态保存在单个进程内。
-/// <list type="bullet">
-///   <item>多实例部署时每个实例各算一套计数，实际允许的尝试次数会成倍放大 ——
-///         此时应替换为分布式实现（如 Redis），接口不变。</item>
-///   <item>攻击者用随机用户名轰炸会撑大内部字典，因此达到阈值后会做一次过期清理。</item>
-/// </list>
+/// 多实例部署时每个实例各算一套计数，实际允许的尝试次数会成倍放大 ——
+/// 此时应替换为分布式实现（如 Redis），接口不变。
 /// </remarks>
 public sealed class InMemoryLoginAttemptGuard : ILoginAttemptGuard
 {
-    /// <summary>超过该条目数时触发一次过期清理，避免随机用户名轰炸导致内存增长。</summary>
-    private const int SweepThreshold = 50_000;
-
     private readonly ConcurrentDictionary<string, AttemptState> _states =
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly TimeProvider _timeProvider;
     private readonly IOptionsMonitor<LoginProtectionOptions> _options;
     private readonly ILogger<InMemoryLoginAttemptGuard> _logger;
+
+    /// <summary>上次过期清理时间：用来给清理做时间节流。</summary>
+    private DateTimeOffset _lastCleanupAt = DateTimeOffset.MinValue;
 
     public InMemoryLoginAttemptGuard(
         TimeProvider timeProvider,
@@ -44,6 +41,9 @@ public sealed class InMemoryLoginAttemptGuard : ILoginAttemptGuard
         _options = options;
         _logger = logger;
     }
+
+    /// <summary>诊断用：当前跟踪的账号数（验证"海量用户名不会撑爆内存"）。</summary>
+    public int TrackedAccountCount => _states.Count;
 
     /// <inheritdoc />
     public void EnsureNotLocked(string userName)
@@ -76,7 +76,7 @@ public sealed class InMemoryLoginAttemptGuard : ILoginAttemptGuard
         var options = _options.CurrentValue;
         var now = _timeProvider.GetUtcNow();
 
-        SweepIfNeeded(now, options);
+        CleanupIfNeeded(now, options);
 
         var state = GetState(userName);
         var window = TimeSpan.FromSeconds(options.FailureWindowSeconds);
@@ -129,10 +129,29 @@ public sealed class InMemoryLoginAttemptGuard : ILoginAttemptGuard
     private AttemptState GetState(string userName) =>
         _states.GetOrAdd(userName, static _ => new AttemptState());
 
-    private void SweepIfNeeded(DateTimeOffset now, LoginProtectionOptions options)
+    /// <summary>
+    /// 防止"随机用户名轰炸"把内存撑爆。
+    /// </summary>
+    /// <remarks>
+    /// <para>两个关键点，缺一个都会把防护本身变成攻击面：</para>
+    /// <list type="number">
+    ///   <item><strong>按时间节流</strong>：如果每次失败都全表扫描，高基数时它就是个 CPU 放大器；</item>
+    ///   <item><strong>硬上限兜底</strong>：过期清理只清得掉"窗口外"的条目，若攻击者持续用新用户名轰炸，
+    ///         条目都还在窗口内，清理释放不出任何空间 —— 必须有按最久未活动淘汰的兜底。</item>
+    /// </list>
+    /// </remarks>
+    private void CleanupIfNeeded(DateTimeOffset now, LoginProtectionOptions options)
     {
-        if (_states.Count < SweepThreshold)
+        // 达到上限一半时才考虑清理，且两次清理之间有最小间隔
+        var cleanupThreshold = Math.Max(1000, options.MaxTrackedAccounts / 2);
+
+        if (_states.Count < cleanupThreshold)
             return;
+
+        if (now - _lastCleanupAt < TimeSpan.FromSeconds(options.CleanupIntervalSeconds))
+            return;
+
+        _lastCleanupAt = now;
 
         var window = TimeSpan.FromSeconds(options.FailureWindowSeconds);
 
@@ -149,7 +168,40 @@ public sealed class InMemoryLoginAttemptGuard : ILoginAttemptGuard
                     _states.TryRemove(pair.Key, out _);
             }
         }
+
+        if (_states.Count >= options.MaxTrackedAccounts)
+            EvictLeastRecentlyActive(now, options);
     }
+
+    /// <summary>
+    /// 兜底淘汰：宁可丢失少量锁定计数（这些账号下次失败会重新计数），也不能让内存无限增长。
+    /// </summary>
+    private void EvictLeastRecentlyActive(DateTimeOffset now, LoginProtectionOptions options)
+    {
+        var target = options.MaxTrackedAccounts * 3 / 4;
+        var removeCount = _states.Count - target;
+
+        if (removeCount <= 0)
+            return;
+
+        var victims = _states
+            .OrderBy(pair => GetLastActivity(pair.Value, now))
+            .Take(removeCount)
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        foreach (var key in victims)
+            _states.TryRemove(key, out _);
+
+        _logger.LogWarning(
+            "登录失败计数条目达到上限，已淘汰最久未活动的 {Count} 条（唯一用户名数量异常，可能存在撞库攻击）",
+            victims.Length);
+    }
+
+    private static DateTimeOffset GetLastActivity(AttemptState state, DateTimeOffset now) =>
+        state.LockedUntil > now
+            ? state.LockedUntil
+            : state.FirstFailureAt ?? DateTimeOffset.MinValue;
 
     private sealed class AttemptState
     {

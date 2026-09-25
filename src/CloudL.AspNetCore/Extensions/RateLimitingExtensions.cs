@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading.RateLimiting;
 using CloudL.AspNetCore.HttpApi.Extensions;
 using CloudL.AspNetCore.Json;
 using CloudL.Domain.Shared.Constants;
-using Microsoft.AspNetCore.Builder; // AddRateLimiter 定义在 Microsoft.AspNetCore.Builder 命名空间下
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
@@ -105,7 +106,14 @@ public static class RateLimitingExtensions
         return services;
     }
 
-    /// <summary>按客户端 IP 分区；IPv4-mapped IPv6 会归一化，避免同一客户端占用两个桶。</summary>
+    /// <summary>
+    /// 解析限流分区键。
+    /// </summary>
+    /// <remarks>
+    /// <para>IPv4 按单个地址；IPv4-mapped IPv6 先归一化，避免同一客户端占用两个桶。</para>
+    /// <para><strong>IPv6 按 /64 前缀</strong>：按单个 IPv6 地址分区粒度太粗（一个 /64 里就有 2^64 个地址），
+    /// 攻击者只要换源地址就能绕过配额；按 /64 聚合才与 IPv4 的防护强度相当。</para>
+    /// </remarks>
     private static string ResolveClientKey(HttpContext httpContext)
     {
         var remoteIp = httpContext.Connection.RemoteIpAddress;
@@ -115,6 +123,13 @@ public static class RateLimitingExtensions
 
         if (remoteIp.IsIPv4MappedToIPv6)
             remoteIp = remoteIp.MapToIPv4();
+
+        if (remoteIp.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            var prefix = remoteIp.GetAddressBytes();
+            Array.Clear(prefix, 8, 8);
+            return new IPAddress(prefix).ToString();
+        }
 
         return remoteIp.ToString();
     }

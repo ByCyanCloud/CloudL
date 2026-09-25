@@ -161,6 +161,17 @@ public class SensitiveDataRedactorTests
     }
 
     [Fact]
+    public void RedactQueryString_ShouldTruncateVeryLongInput()
+    {
+        var longQuery = "?" + new string('a', 5000) + "=1";
+
+        var redacted = SensitiveDataRedactor.RedactQueryString(longQuery);
+
+        Assert.EndsWith("...(已截断)", redacted, StringComparison.Ordinal);
+        Assert.True(redacted.Length < 1200, "超长 query 必须先截断再进日志");
+    }
+
+    [Fact]
     public void RedactAuthorizationHeader_ShouldKeepSchemeAndTailButNotWholeToken()
     {
         const string header = "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature";

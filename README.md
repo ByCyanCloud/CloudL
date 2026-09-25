@@ -8,12 +8,15 @@
 | 包 | 内容 |
 |---|---|
 | `CloudL.Core` | 领域基类（`Entity<TKey>`/`AuditableEntity`/`ValueObject`）、共享内核（常量、异常）、应用契约（分页 DTO、服务接口）、领域事件分发、Mapster 全局约定 |
-| `CloudL.EntityFrameworkCore` | `FrameworkDbContext`（审计/乐观锁/领域事件）、`EfCoreRepository<,>`、`EfCoreUnitOfWork`、实体配置基类、`AddFrameworkDbContext<TContext>()` |
-| `CloudL.AspNetCore` | 统一响应 `ApiResponse`、全局异常中间件、模型验证过滤器、JWT/CORS/Swagger 集成、当前用户上下文、PBKDF2 密码哈希、HTTP 客户端封装、`AddFramework()` |
+| `CloudL.EntityFrameworkCore` | 持久化核心（**与数据库无关**）：`FrameworkDbContext`（审计/乐观锁/领域事件）、`EfCoreRepository<,>`、`EfCoreUnitOfWork`（`ExecuteInTransactionAsync`）、实体配置基类、`AddCloudLEntityFrameworkCore<TContext>()`、`GetRequiredConnectionString()` |
+| `CloudL.EntityFrameworkCore.PostgreSql` | PostgreSQL 提供程序：`options.UseCloudLPostgreSql(connectionString)` |
+| `CloudL.EntityFrameworkCore.SqlServer` | SQL Server 提供程序：`options.UseCloudLSqlServer(connectionString)` |
+| `CloudL.AspNetCore` | 统一响应、全局异常中间件、模型验证过滤器、**query 命名校验**、**IP 维度限流**、**账号锁定**、JWT/CORS/Swagger、当前用户上下文、PBKDF2 密码哈希、HTTP 客户端封装、**请求日志与脱敏**、`AddCloudLAspNetCore()` |
+| `CloudL.Templates` | `dotnet new` 模板（九层业务骨架），短名 `cloudl`；`dotnet new install CloudL.Templates` |
 
 ## 架构概览
 
-框架 = **5 个 NuGet 包** + **9 层业务骨架**（由 `dotnet new cloudl` 生成）：
+框架 = **5 个框架包 + 1 个模板包** + **9 层业务骨架**（由 `dotnet new cloudl` 生成）：
 
 ```
 业务项目
@@ -31,6 +34,7 @@
                          CloudL.AspNetCore
                          CloudL.EntityFrameworkCore
                          CloudL.EntityFrameworkCore.PostgreSql（或 .SqlServer）
+                         CloudL.Templates（dotnet new 模板）
 ```
 
 依赖方向始终单向：`Web → HttpApi → Application → Domain`；
@@ -136,7 +140,8 @@ dotnet package update CloudL.Core@0.1.0
   默认连续 5 次失败锁定 60 秒，锁定期内登录返回 429（业务码 4291）。
   中间件阶段用户名还在请求体里，强行读取请求体既昂贵又不可靠；
   而且把 IP 与用户名拼成一个分区键反而更弱 —— 换个用户名就是新配额。
-- 登录保护配置（配置节 `LoginProtection`）：`MaxFailures`（默认 5）、`FailureWindowSeconds`（默认 300）、`LockoutSeconds`（默认 60）。
+- 登录保护配置（配置节 `LoginProtection`）：`MaxFailures`（默认 5）、`FailureWindowSeconds`（默认 300）、`LockoutSeconds`（默认 60）、
+  `MaxTrackedAccounts`（默认 200000，超过后按最久未活动淘汰）、`CleanupIntervalSeconds`（默认 30，清理节流）。
 - **默认实现是进程内的**：多实例部署时每个实例各算一套计数，实际允许次数会成倍放大，
   此时应替换为分布式实现（如 Redis），接口不变。
 

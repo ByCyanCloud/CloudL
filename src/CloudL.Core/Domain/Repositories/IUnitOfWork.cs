@@ -18,6 +18,10 @@ public interface IUnitOfWork
     /// 若需要处理器与主事务同生共死，请把它显式写成主操作的一部分。</para>
     /// <para>嵌套调用会复用最外层事务；最外层决定提交或回滚。
     /// 操作结束后会自动调用一次 <see cref="SaveChangesAsync"/> 收尾。</para>
+    /// <para><strong>重试语义</strong>：内部通过执行策略（ExecutionStrategy）执行，
+    /// 若数据库提供程序启用了重试（如 SQL Server 的 EnableRetryOnFailure），遇到瞬时故障时
+    /// <strong>整个操作委托会被重放</strong> —— 因此委托内的逻辑必须可重复执行（幂等），
+    /// 不要在里面发送通知、调用外部接口等有副作用的动作。</para>
     /// </remarks>
     Task ExecuteInTransactionAsync(
         Func<CancellationToken, Task> operation,

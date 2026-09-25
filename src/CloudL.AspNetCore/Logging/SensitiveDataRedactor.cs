@@ -22,6 +22,9 @@ public static class SensitiveDataRedactor
     private const string Mask = "***";
     private const int MaxBodyLength = 4096;
 
+    /// <summary>query 串的日志长度上限（请求体有上限，query 串同样需要）。</summary>
+    private const int MaxQueryStringLength = 1024;
+
     /// <summary>按名遮蔽的字段名（大小写不敏感；比较前会去掉下划线与连字符）。</summary>
     private static readonly HashSet<string> SensitiveKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -69,6 +72,10 @@ public static class SensitiveDataRedactor
         if (string.IsNullOrWhiteSpace(queryString))
             return string.Empty;
 
+        var truncated = queryString.Length > MaxQueryStringLength;
+        if (truncated)
+            queryString = queryString[..MaxQueryStringLength];
+
         var hasPrefix = queryString.StartsWith('?');
         var raw = hasPrefix ? queryString[1..] : queryString;
 
@@ -101,7 +108,8 @@ public static class SensitiveDataRedactor
         if (result.Length == 0)
             return string.Empty;
 
-        return hasPrefix ? "?" + result : result;
+        var redacted = hasPrefix ? "?" + result : result;
+        return truncated ? redacted + "...(已截断)" : redacted;
     }
 
     /// <summary>

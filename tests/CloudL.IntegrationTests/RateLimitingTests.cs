@@ -73,6 +73,30 @@ public class RateLimitingTests
         }
     }
 
+    [Fact]
+    public async Task SameIpv6Prefix64_ShouldShareQuota()
+    {
+        await using var host = await CloudLTestHost.StartAsync(LimitedSettings());
+
+        for (var index = 0; index < PermitLimit; index++)
+            await SendAsync(host, "2001:db8:1:1::1");
+
+        // 同一 /64 内换地址不应拿到新配额：否则拥有一个 /64 就能绕过限流
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await SendAsync(host, "2001:db8:1:1::abcd")).StatusCode);
+    }
+
+    [Fact]
+    public async Task DifferentIpv6Prefix64_ShouldHaveIndependentQuota()
+    {
+        await using var host = await CloudLTestHost.StartAsync(LimitedSettings());
+
+        for (var index = 0; index < PermitLimit; index++)
+            await SendAsync(host, "2001:db8:2:1::1");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await SendAsync(host, "2001:db8:2:1::2")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(host, "2001:db8:3:1::1")).StatusCode);
+    }
+
     private static async Task<HttpResponseMessage> SendAsync(CloudLTestHost host, string clientIp)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/diagnostic/limited");

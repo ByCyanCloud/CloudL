@@ -131,10 +131,33 @@ public class LoginAttemptGuardTests
         guard.Reset("   ");
     }
 
+    [Fact]
+    public void ExceedingTrackedAccountLimit_ShouldKeepMemoryBounded()
+    {
+        // 把上限压到 1000，模拟"攻击者用海量不同用户名轰炸"
+        var (guard, clock) = CreateGuard(maxFailures: 5, maxTrackedAccounts: 1000);
+
+        for (var batch = 0; batch < 6; batch++)
+        {
+            for (var index = 0; index < 500; index++)
+                guard.RecordFailure($"attacker-{batch}-{index}");
+
+            clock.Advance(TimeSpan.FromSeconds(31));   // 让下一次过期清理不被节流
+        }
+
+        // 累计出现 3000 个不同用户名：跟踪量必须被兜底淘汰压住，而不是线性增长到 3000。
+        // 清理与淘汰本身有节流（CleanupIntervalSeconds），所以稳态会略高于硬上限（约一个批次的量级），
+        // 这是刻意的取舍：宁可短暂多留一点条目，也不让"每次失败都做一次全表扫描"。
+        Assert.True(
+            guard.TrackedAccountCount < 2000,
+            $"跟踪量应被上限压住（远小于 3000），实际为 {guard.TrackedAccountCount}");
+    }
+
     private static (InMemoryLoginAttemptGuard Guard, MutableTimeProvider Clock) CreateGuard(
         int maxFailures = 3,
         int lockoutSeconds = 60,
-        int windowSeconds = 300)
+        int windowSeconds = 300,
+        int maxTrackedAccounts = 200_000)
     {
         var clock = new MutableTimeProvider();
 
@@ -144,6 +167,7 @@ public class LoginAttemptGuardTests
             options.MaxFailures = maxFailures;
             options.LockoutSeconds = lockoutSeconds;
             options.FailureWindowSeconds = windowSeconds;
+            options.MaxTrackedAccounts = maxTrackedAccounts;
         });
 
         var provider = services.BuildServiceProvider();

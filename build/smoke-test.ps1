@@ -136,5 +136,48 @@ else {
     Write-Host '迁移与模型一致' -ForegroundColor Green
 }
 
+# ---------- 7. 运行时管道检查：健康检查必须匿名可访问 ----------
+# 来自一个真实缺陷：模板的 FallbackPolicy 要求认证，而 MapHealthChecks 没有 AllowAnonymous，
+# 负载均衡 / k8s 探针会拿到 401 并判定"永远不健康" —— 这类管道装配问题编译期看不出来。
+Write-Step '运行时检查：/health 可被探针匿名访问'
+
+$webProject = Join-Path $OutputDir "src/$projectName.Web/$projectName.Web.csproj"
+$webPort = 10003   # 与模板 appsettings.json 的 Kestrel 端口一致
+$probe = Start-Process -FilePath 'dotnet' -ArgumentList @('run', '--project', $webProject, '--no-build') -PassThru -WindowStyle Hidden
+
+try {
+    $healthStatus = 0
+
+    for ($attempt = 0; $attempt -lt 15; $attempt++) {
+        try {
+            $response = Invoke-WebRequest "http://localhost:$webPort/health" -TimeoutSec 30
+            $healthStatus = [int]$response.StatusCode
+            break
+        }
+        catch {
+            if ($_.Exception.Response) {
+                $healthStatus = [int]$_.Exception.Response.StatusCode
+                break
+            }
+
+            Start-Sleep -Seconds 2   # 应用还在启动
+        }
+    }
+
+    if ($healthStatus -eq 0) {
+        throw '应用未能在预期时间内响应 /health，无法完成运行时检查。'
+    }
+
+    if ($healthStatus -eq 401 -or $healthStatus -eq 403) {
+        throw "/health 返回 $healthStatus：探针会被挡在认证之外。请确认 MapHealthChecks 上加了 AllowAnonymous。"
+    }
+
+    Write-Host "    /health -> HTTP $healthStatus（非 401/403，探针可用）" -ForegroundColor Green
+}
+finally {
+    if ($IsWindows) { taskkill /PID $probe.Id /T /F 2>&1 | Out-Null }
+    else { Stop-Process -Id $probe.Id -Force -ErrorAction SilentlyContinue }
+}
+
 Write-Host ""
 Write-Host '冒烟测试通过 ✅' -ForegroundColor Green

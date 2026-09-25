@@ -97,7 +97,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/health");
+// 健康检查必须匿名可访问：FallbackPolicy 默认要求认证，探针拿到 401 会被判定为"永远不健康"
+app.MapHealthChecks("/health").AllowAnonymous();
 
 try
 {

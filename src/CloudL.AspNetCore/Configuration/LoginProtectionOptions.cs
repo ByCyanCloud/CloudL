@@ -21,4 +21,15 @@ public sealed class LoginProtectionOptions
     /// <summary>触发后锁定多长时间（秒）。</summary>
     [Range(1, 86400)]
     public int LockoutSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// 最多跟踪多少个用户名。超过后按"最久未活动"淘汰 ——
+    /// 防止攻击者用海量不同用户名把内存撑爆（宁可丢少量计数，也不能被耗尽内存）。
+    /// </summary>
+    [Range(1000, 10_000_000)]
+    public int MaxTrackedAccounts { get; set; } = 200_000;
+
+    /// <summary>两次过期清理之间的最小间隔（秒）：避免高基数时每次失败都全表扫描。</summary>
+    [Range(1, 3600)]
+    public int CleanupIntervalSeconds { get; set; } = 30;
 }
