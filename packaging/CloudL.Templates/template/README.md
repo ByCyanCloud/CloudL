@@ -100,7 +100,7 @@ dotnet nuget add source <框架仓库路径>/local-feed -n cloudl-local
 | Query 参数 | `?page_index=2&page_size=50&sort_by=user_name&sort_direction=asc` |
 | 验证错误键 | `{"errors":{"page_index":["页码必须大于等于 1"]}}` |
 
-query 参数统一使用 **snake_case**（`?page_index=2`）。框架会校验参数名，**出现大写字母（如 `?pageIndex=2`）直接返回 400**，避免参数被静默忽略。
+- Query 参数：只支持 **camelCase**（如 `pageIndex`、`pageSize`、`sortBy`、`sortDirection`）；MVC 大小写不敏感，PascalCase 亦可；**不再支持 snake_case**。
 
 ## 必须修改的配置
 

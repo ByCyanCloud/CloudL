@@ -84,7 +84,7 @@
 | 契约 | 内容 |
 |---|---|
 | JSON 命名 | 属性名 `snake_case`；**字典键原样保留**（`{"USD":"美元"}` 不会被改成 `usd`）；忽略 `null`；中文不转义 |
-| Query 命名 | 只接受 `snake_case`（单词键如 `id` 也合法）；**含大写字母直接返回 400**；Swagger 文档同步显示 `snake_case` |
+| Query 命名 | 只支持 camelCase / PascalCase（MVC 大小写不敏感绑定）；**snake_case 已移除**；响应 JSON 仍为 snake_case |
 | 统一响应 | `{ success, status_code, message, data \| errors, error_id, error_detail(仅开发环境且 5xx) }` |
 | 业务码 | 2000 成功、4000/4001 参数与业务校验、4010/4011 认证、4030 权限、4040 不存在、4090 冲突、4290 限流、4291 账号锁定、5000 服务端、5020/5040 下游 |
 | 异常→状态码 | 见 README「异常与状态码映射」；**只有框架定义的业务异常才透传消息**，其它一律 500 + 通用消息 |

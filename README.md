@@ -108,10 +108,10 @@ dotnet package update CloudL.Core@0.1.0
 | 位置 | 约定 | 示例 |
 |---|---|---|
 | JSON 请求体 / 响应体 | snake_case | `{"user_name":"alice","row_version":"..."}` |
-| Query 参数 | snake_case（唯一约定，含大写字母的参数名返回 400） | `?page_index=2&page_size=50&sort_by=user_name` |
+Query 参数：只支持 **camelCase**（如 `pageIndex`、`pageSize`、`sortBy`、`sortDirection`）；MVC 大小写不敏感，PascalCase 亦可；**不再支持 snake_case**。
 | 验证错误键 | snake_case | `{"errors":{"page_index":["页码必须大于等于 1"]}}` |
 | 业务字典的键 | **原样保留**（不做转换，避免 `USD` → `usd` 这类语义损坏） | `{"USD":"美元"}` |
-| Swagger 文档 | 与上一致（query 参数同样显示为 snake_case） | — |
+Query 参数：只支持 **camelCase**（如 `pageIndex`、`pageSize`、`sortBy`、`sortDirection`）；MVC 大小写不敏感，PascalCase 亦可；**不再支持 snake_case**。
 
 实现：`CloudLJson`（JSON）、`SnakeCaseQueryValueProviderFactory`（query 绑定）、
 `SnakeCaseQueryParameterOperationFilter`（Swagger），由 `AddCloudLAspNetCore` 自动接入。
