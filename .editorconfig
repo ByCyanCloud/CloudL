@@ -6,6 +6,10 @@
 #
 # 原则：只声明**本仓库确实遵守**的规则，并把纯风格规则的严重级别压到 suggestion ——
 #      否则（配合 Directory.Build.props 的 TreatWarningsAsErrors）会把风格提示变成一堵墙。
+#
+# 本仓库刻意不开启 EnforceCodeStyleInBuild：代码风格不进构建门禁，
+# 否则 SDK 升级带来的规则变化（新增或改判的 IDE 规则）可能让构建突然失败。
+# 只要 IDE 与这份文件一致，就不会再出现同一份代码在不同机器上报不同告警的问题。
 
 root = true
 

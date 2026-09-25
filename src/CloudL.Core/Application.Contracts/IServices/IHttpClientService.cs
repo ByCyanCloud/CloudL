@@ -7,7 +7,7 @@ namespace CloudL.Application.Contracts.IServices;
 public interface IHttpClientService
 {
     /// <summary>默认具名客户端名称；调用方法未指定 clientName 时使用。</summary>
-    public const string DefaultClientName = "Default";
+    const string DefaultClientName = "Default";
 
     /// <summary>GET 请求并反序列化为 <typeparamref name="TResponse"/>（为 string 时返回原始响应体）。</summary>
     Task<TResponse?> GetAsync<TResponse>(
