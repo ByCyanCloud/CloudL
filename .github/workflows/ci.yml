@@ -61,6 +61,15 @@ jobs:
             exit 1
           fi
 
+      - name: 诊断·漏洞审计原始输出（总是运行，失败时据此定位）
+        if: always()
+        shell: pwsh
+        run: |
+          $output = & dotnet list CloudL.slnx package --vulnerable --include-transitive 2>&1 | Out-String
+          $lines = @(($output -split "`n") | Where-Object { $_ -match '\S' } | Select-Object -First 40)
+          $lines | ForEach-Object { Write-Host $_ }
+          $flat = ($lines -join '%0A')
+          Write-Host "::warning::漏洞审计原始输出：$flat"
       - name: 模板冒烟测试（生成 → 编译 → 测试 → 迁移一致性）
         run: pwsh ./build/smoke-test.ps1 -SkipPack
 
