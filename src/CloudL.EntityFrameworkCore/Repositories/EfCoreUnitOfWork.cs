@@ -57,40 +57,49 @@ public class EfCoreUnitOfWork : IUnitOfWork
         return await strategy.ExecuteAsync(async () =>
         {
             // 事务范围内延迟领域事件分发（回滚时直接丢弃，不会产生幽灵事件）
-            using var deferral = _dbContext.BeginDomainEventDeferral();
-
-            await using var transaction = await _dbContext.Database
-                .BeginTransactionAsync(cancellationToken)
-                .ConfigureAwait(false);
+            var deferral = _dbContext.BeginDomainEventDeferral();
 
             TResult result;
 
             try
             {
-                result = await operation(cancellationToken).ConfigureAwait(false);
+                await using var transaction = await _dbContext.Database
+                    .BeginTransactionAsync(cancellationToken)
+                    .ConfigureAwait(false);
 
-                // 收尾：把操作里没有显式提交的变更一起落库
-                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch
-            {
                 try
                 {
-                    await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
-                }
-                catch (InvalidOperationException)
-                {
-                    // 提交阶段失败时事务可能已经结束；此时回滚会抛"事务已完成"。
-                    // 原始异常才是要向上抛的那个，因此这里不覆盖它。
-                }
+                    result = await operation(cancellationToken).ConfigureAwait(false);
 
-                _dbContext.DiscardDeferredDomainEvents();
-                throw;
+                    // 收尾：把操作里没有显式提交的变更一起落库
+                    await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch
+                {
+                    try
+                    {
+                        await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // 提交阶段失败时事务可能已经结束；此时回滚会抛"事务已完成"。
+                        // 原始异常才是要向上抛的那个，因此这里不覆盖它。
+                    }
+
+                    _dbContext.DiscardDeferredDomainEvents();
+                    throw;
+                }
+            }
+            finally
+            {
+                // 关键：先结束延迟范围，再分发事件。否则处理器内部触发的 SaveChanges 会把新事件
+                // 塞回延迟队列，而队列此刻已被取走 —— 那些事件会被静默丢弃。
+                deferral.Dispose();
             }
 
-            // 事务已提交，此时才分发领域事件
+            // 事务已提交，此时才分发领域事件（处理器里再写数据会立即分发，不会滞留）
             await _dbContext.FlushDeferredDomainEventsAsync(cancellationToken).ConfigureAwait(false);
 
             return result;
