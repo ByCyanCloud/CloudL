@@ -119,8 +119,11 @@ public abstract class FrameworkDbContext : DbContext
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken)
     {
-        // 1. 先收集领域事件：此时实体仍处于 Added/Modified 状态，事件最完整
-        var domainEvents = ChangeTracker.Entries<BaseEntity>()
+        // 1. 收集领域事件：此时实体仍处于 Added/Modified 状态，事件最完整。
+        // 同时记住这批条目，保存后清空事件时复用 —— 不必再遍历一次 ChangeTracker
+        // （顺带修掉一个小问题：被删除的实体在保存后已 Detached，重新查询会漏掉它的事件）。
+        var eventfulEntries = ChangeTracker.Entries<BaseEntity>().ToArray();
+        var domainEvents = eventfulEntries
             .SelectMany(entry => entry.Entity.DomainEvents)
             .ToArray();
 
@@ -141,7 +144,10 @@ public abstract class FrameworkDbContext : DbContext
         finally
         {
             // 无论成功失败都清空，避免下次保存时重复分发
-            ClearDomainEvents();
+            foreach (var entry in eventfulEntries)
+            {
+                entry.Entity.ClearDomainEvents();
+            }
         }
 
         // 4. 提交成功后再分发；若处在事务延迟范围内，则先攒起来等事务提交
@@ -181,13 +187,6 @@ public abstract class FrameworkDbContext : DbContext
         }
     }
 
-    private void ClearDomainEvents()
-    {
-        foreach (var entry in ChangeTracker.Entries<BaseEntity>())
-        {
-            entry.Entity.ClearDomainEvents();
-        }
-    }
 
     /// <summary>
     /// 为字符串列应用默认长度与 Unicode 约定。

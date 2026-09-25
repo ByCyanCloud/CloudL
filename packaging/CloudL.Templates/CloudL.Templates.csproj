@@ -39,11 +39,22 @@
       —— 根目录的 Directory.Build.props 正是用同样写法把 README.md 打进各包的
       （SDK 的 NuGet.Build.Tasks.Pack.targets 中 _PackageFiles 明确收集 "%(None.Pack) == 'true'"）。
     -->
+    <!--
+      nuget.org 上展示模板自己的 README：Directory.Build.props 会把框架 README 全局打进每个包，
+      这里把它移除，改用模板目录里的 README（同时它仍作为内容进包，供生成的项目使用）。
+    -->
+    <None Remove="$(MSBuildThisFileDirectory)..\..\README.md" />
     <None Remove="template\**\*" />
     <None Include="template\**\*"
           Exclude="template\**\bin\**;template\**\obj\**;template\**\.vs\**"
           Pack="true"
           PackagePath="content\CloudL.WebApi\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <!--
+      模板 README 另放一份到包根作为包自述文件。注意必须放在上面的 Remove 之后，
+      否则会被 template\**\* 的 Remove 一起删掉（表现为 NU5039「包中不存在自述文件」）。
+    -->
+    <None Include="template\README.md" Pack="true" PackagePath="\" />
 
     <!-- 模板源码不参与本打包项目的编译（否则 47 个业务 .cs 会被当成这个项目的源码） -->
     <Compile Remove="**\*" />

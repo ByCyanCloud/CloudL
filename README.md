@@ -236,3 +236,16 @@ dotnet new cloudl -n MyCompany.BookStore -o ./BookStore
 - 本仓库开发时不必手动安装：`pwsh ./build/pack.ps1` 打完包会**从包安装**模板；
 - 冒烟测试同样从包安装，因此每次 CI 都在验证**打包结果本身**可用（而不是只验证源码目录）。
 
+## 发版清单
+
+每次发布（打 `v*` 标签）按顺序检查：
+
+1. **CHANGELOG**：把「未发布」整理成 `[x.y.z]`，重点写清「迁移影响」——是否需要业务侧改代码、是否要重新生成迁移。
+2. **模板默认版本**：`packaging/CloudL.Templates/template/Directory.Packages.props` 里的 `CLOUDL_VERSION`
+   改成新版本线（例如 `0.2.*`），否则新生成的项目仍会引用旧版本线。
+3. **API 兼容性基线**：发布成功后把 `Directory.Build.props` 的 `PackageValidationBaselineVersion` 更新为新版本，
+   并删掉两个 provider 包（`CloudL.EntityFrameworkCore.PostgreSql` / `.SqlServer`）里那两行空的基线覆盖；
+   基线更新后，`CompatibilitySuppressions.xml` 中针对旧基线的条目即失效，可以清理。
+4. **框架与模板共同依赖的包要同步升级**：例如 `Serilog.AspNetCore` 两边都引用（当前都是 8.0.3），
+   只升一边会让消费方撞上 NU1605 包降级错误。
+5. **发布后核对**：nuget.org 上 6 个包（含 `CloudL.Templates`）与符号包是否齐全、README 是否正常展示。
