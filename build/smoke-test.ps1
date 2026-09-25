@@ -143,12 +143,14 @@ Write-Step '运行时检查：/health 可被探针匿名访问'
 
 $webProject = Join-Path $OutputDir "src/$projectName.Web/$projectName.Web.csproj"
 $webPort = 10003   # 与模板 appsettings.json 的 Kestrel 端口一致
-$probe = Start-Process -FilePath 'dotnet' -ArgumentList @('run', '--project', $webProject, '--no-build') -PassThru -WindowStyle Hidden
+# 注意：不要用 -WindowStyle（Linux 上不受支持，会让整步直接失败）；应用输出落盘以便失败时诊断
+$appLog = Join-Path ([System.IO.Path]::GetTempPath()) 'cloudl-smoke-app.log'
+$probe = Start-Process -FilePath 'dotnet' -ArgumentList @('run', '--project', $webProject, '--no-build') -PassThru -RedirectStandardOutput $appLog -RedirectStandardError "$appLog.err"
 
 try {
     $healthStatus = 0
 
-    for ($attempt = 0; $attempt -lt 15; $attempt++) {
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
         try {
             $response = Invoke-WebRequest "http://localhost:$webPort/health" -TimeoutSec 30
             $healthStatus = [int]$response.StatusCode
@@ -165,10 +167,13 @@ try {
     }
 
     if ($healthStatus -eq 0) {
+        $tail = (Get-Content -LiteralPath $appLog -Tail 20 -ErrorAction SilentlyContinue) -join ' | '
+        Write-Host "::error::/health 无响应（应用可能未启动）。应用日志尾部：$tail"
         throw '应用未能在预期时间内响应 /health，无法完成运行时检查。'
     }
 
     if ($healthStatus -eq 401 -or $healthStatus -eq 403) {
+        Write-Host "::error::/health 返回 $healthStatus，探针会被挡在认证之外"
         throw "/health 返回 $healthStatus：探针会被挡在认证之外。请确认 MapHealthChecks 上加了 AllowAnonymous。"
     }
 

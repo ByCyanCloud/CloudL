@@ -18,6 +18,8 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+  <!-- Sqlite 带出的传递依赖 2.1.11 有已知高危漏洞（GHSA-2m69-gcr7-jv3q），显式钉到同主版本线的补丁版 -->
+  <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
   </ItemGroup>
 
   <!--
