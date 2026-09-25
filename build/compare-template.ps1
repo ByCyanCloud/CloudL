@@ -103,6 +103,7 @@ $patterns = @(
     'Directory.Build.props',
     'Directory.Packages.props',
     '.editorconfig',
+    '.gitignore',
     'src/*/*.csproj',
     'src/*/Program.cs',
     'src/*/*Module.cs',
@@ -172,7 +173,7 @@ if ($different.Count -gt 0) {
     foreach ($name in $different) {
         $report.Add("########## $name ##########")
         $gitDiff = git diff --no-index --no-color -- (Join-Path $tempProject $name) (Join-Path $ProjectPath $name) 2>&1
-        $report.AddRange([string[]]$gitDiff)
+        $report.AddRange([string[]]@($gitDiff | Where-Object { $_ -notmatch '^warning:' }))
         $report.Add('')
     }
 }

@@ -245,8 +245,11 @@ dotnet new cloudl -n MyCompany.BookStore -o ./BookStore
 
 1. **CHANGELOG**：把「未发布」整理成 `[x.y.z]`，重点写清「迁移影响」——是否需要业务侧改代码、是否要重新生成迁移。
    契约分级与各节的权威描述在 `CONTRACT.md`，CHANGELOG 直接引用其分节名即可。
-2. **模板默认版本**：`packaging/CloudL.Templates/template/Directory.Packages.props` 里的 `CLOUDL_VERSION`
-   改成新版本线（例如 `0.2.*`），否则新生成的项目仍会引用旧版本线。
+2. **模板默认版本**：改 `packaging/CloudL.Templates/template/.template.config/template.json` 中
+   `frameworkVersion` 符号的 `defaultValue`（当前 `0.1.0-*`）为新版本线（例如 `0.2.*`），
+   并同步 `template/README.md` 里提到 `0.1.0-*` 的那句示例。
+   注意：`template/Directory.Packages.props` 里写的是占位符 `CLOUDL_VERSION` —— **不要**在那里写死版本，
+   生成时由模板引擎替换。
 3. **API 兼容性基线**：发布成功后把 `Directory.Build.props` 的 `PackageValidationBaselineVersion` 更新为新版本，
    并删掉两个 provider 包（`CloudL.EntityFrameworkCore.PostgreSql` / `.SqlServer`）里那两行空的基线覆盖；
    基线更新后，`CompatibilitySuppressions.xml` 中针对旧基线的条目即失效，可以清理。

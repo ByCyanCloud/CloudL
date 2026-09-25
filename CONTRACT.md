@@ -16,7 +16,7 @@
 | 🔧 **实现细节** | 可以自由改（包括删除），不要依赖它 | `internal` 成员、日志文本、临时目录、内部缓存策略、`InMemory*` 实现的内部结构 |
 
 **执行方式**：打包时由包校验（ApiCompat）自动比对上一个已发布版本 —— 破坏性变更会让打包失败，除非在对应的
-`CompatibilitySuppressions.xml` 里显式登记（那份文件就是契约变更台账）。当前已登记 8 条（Core 4 + EFCore 4）。
+`CompatibilitySuppressions.xml` 里显式登记（那份文件就是契约变更台账，条目数随版本增长）。
 
 ---
 
