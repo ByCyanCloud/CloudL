@@ -38,11 +38,7 @@ public sealed class TimeOptions
         if (string.Equals(value, "Local", StringComparison.OrdinalIgnoreCase))
             return DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified);
 
-        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var offset))
-            return DateTime.SpecifyKind(DateTime.UtcNow + offset, DateTimeKind.Unspecified);
-
-        throw new InvalidOperationException(
-            $"配置 Time:Clock 无法识别：'{Clock}'。支持 Utc、Local 或固定偏移（如 +08:00）。");
+        return DateTime.SpecifyKind(DateTime.UtcNow + ParseOffset(value), DateTimeKind.Unspecified);
     }
 
     /// <summary>把带偏移的时间换算成本口径的墙上钟时间。</summary>
@@ -56,11 +52,25 @@ public sealed class TimeOptions
         if (string.Equals(current, "Local", StringComparison.OrdinalIgnoreCase))
             return DateTime.SpecifyKind(value.LocalDateTime, DateTimeKind.Unspecified);
 
-        if (TimeSpan.TryParse(current, CultureInfo.InvariantCulture, out var offset))
-            return DateTime.SpecifyKind(value.UtcDateTime + offset, DateTimeKind.Unspecified);
+        return DateTime.SpecifyKind(value.UtcDateTime + ParseOffset(current), DateTimeKind.Unspecified);
+    }
+
+    /// <summary>
+    /// 解析固定偏移。
+    /// </summary>
+    /// <remarks>
+    /// 注意：<c>TimeSpan.TryParse</c> <strong>不接受前导 <c>+</c></strong>（只接受 <c>-</c>），
+    /// 而配置里最常见的写法恰恰是 <c>+08:00</c> —— 所以这里先剥掉 <c>+</c> 再解析，否则会直接抛异常。
+    /// </remarks>
+    private static TimeSpan ParseOffset(string value)
+    {
+        var normalized = value.StartsWith('+') ? value[1..] : value;
+
+        if (TimeSpan.TryParse(normalized, CultureInfo.InvariantCulture, out var offset))
+            return offset;
 
         throw new InvalidOperationException(
-            $"配置 Time:Clock 无法识别：'{Clock}'。支持 Utc、Local 或固定偏移（如 +08:00）。");
+            $"配置 Time:Clock 无法识别：'{value}'。支持 Utc、Local 或固定偏移（如 +08:00）。");
     }
 }
 

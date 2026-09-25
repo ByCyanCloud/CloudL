@@ -4,6 +4,22 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.2.3] - 2026-09-25
+
+### 变更（破坏性：时间存储与输出格式）
+
+- **时间一律不存储时区**：数据库时间列改为"不带时区"类型（PostgreSQL 由 `timestamptz` 改为
+  `timestamp without time zone`；SQL Server 的 `datetime2` 本来就不带）。库里存的就是墙上钟时间。
+- **API 输出的时间不再带 `Z`**（此前带 `Z` 表示 UTC）。
+- 新增时间口径配置 `Time:Clock`：`Utc`（默认）、固定偏移（如 `+08:00`，与服务器时区无关）、
+  `Local`（等价于 `DateTime.Now`，跟随服务器时区）。审计字段按该口径写入。
+  ⚠️ 选 `Local` 时必须把运行环境时区钉死（容器 `TZ=Asia/Shanghai`），否则不同环境会写出不同的墙上钟。
+
+### 迁移影响
+
+- ⚠️ **需要重新生成 EF 迁移**：时间列类型已变更。
+- **客户端**：不要再假设时间带时区标识，按"服务端约定的本地时间"理解。
+- 存量数据：由使用方自行决定（本次未提供数据迁移脚本）。
 ## [0.2.2] - 2026-09-25
 
 ### 修复

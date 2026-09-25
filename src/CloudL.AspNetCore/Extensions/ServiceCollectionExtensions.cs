@@ -1,3 +1,4 @@
+using CloudL.Domain.Shared.Time;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
@@ -79,6 +80,16 @@ public static class ServiceCollectionExtensions
         services.AddCloudLJwtAuthentication();
         services.AddCloudLCors(configuration);
         services.AddCloudLRateLimiting(configuration);
+
+        // 时间口径：本框架不存储时区，库里就是墙上钟时间。
+        // Clock = Utc（默认）/ 固定偏移（如 +08:00，与服务器时区无关）/ Local（跟随服务器时区）。
+        // ⚠️ 选 Local 时必须把运行环境时区钉死（容器 TZ=Asia/Shanghai），否则不同环境会写出不同的墙上钟。
+        services.AddOptions<TimeOptions>()
+            .Bind(configuration.GetSection(TimeOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        CloudLTime.Configure(configuration.GetSection(TimeOptions.SectionName).Get<TimeOptions>());
 
         // 请求/响应体与验证错误键仍为 snake_case；query 参数自 0.2.1 起为 camelCase
         // 同时保留 camelCase 写法，避免破坏既有调用方。
