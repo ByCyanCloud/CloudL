@@ -47,4 +47,6 @@
     <PackageVersion Include="Moq" Version="4.20.72" />
   </ItemGroup>
 
+  <!-- 显式提升传递依赖：EF Core Sqlite 带出的 2.1.11 有已知高危漏洞（GHSA-2m69-gcr7-jv3q） -->
+  <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
 </Project>
