@@ -3,6 +3,9 @@
 面向 **.NET 10** 的 DDD Web API 框架。框架以 **NuGet 包**形式发布，业务项目通过引用包使用框架；
 框架升级 = 改版本号（或 `dotnet package update`），不再需要复制/同步源码。
 
+> 框架的**对外契约**（哪些是承诺、哪些是实现；配置键、行为约定、数据库约定、升级步骤）见
+> [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
+
 ## 包一览
 
 | 包 | 内容 |
@@ -241,6 +244,7 @@ dotnet new cloudl -n MyCompany.BookStore -o ./BookStore
 每次发布（打 `v*` 标签）按顺序检查：
 
 1. **CHANGELOG**：把「未发布」整理成 `[x.y.z]`，重点写清「迁移影响」——是否需要业务侧改代码、是否要重新生成迁移。
+   契约分级与各节的权威描述在 `CONTRACT.md`，CHANGELOG 直接引用其分节名即可。
 2. **模板默认版本**：`packaging/CloudL.Templates/template/Directory.Packages.props` 里的 `CLOUDL_VERSION`
    改成新版本线（例如 `0.2.*`），否则新生成的项目仍会引用旧版本线。
 3. **API 兼容性基线**：发布成功后把 `Directory.Build.props` 的 `PackageValidationBaselineVersion` 更新为新版本，

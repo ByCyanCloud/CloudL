@@ -1,3 +1,9 @@
+// ============================================================================
+// 本文件由 CloudL 模板生成，属于「框架装配」部分。
+// 升级 CloudL.* 包不会更新本文件（模板是复制，不是依赖）。
+// 需要同步模板改进时，在框架仓库执行：
+//     pwsh ./build/compare-template.ps1 -ProjectPath <你的项目根目录>
+// ============================================================================
 using CloudL.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
