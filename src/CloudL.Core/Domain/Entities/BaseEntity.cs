@@ -1,7 +1,7 @@
 namespace CloudL.Domain.Entities;
 
-using CloudL.Domain.DomainEvents;
 using CloudL.Domain.Shared.Time;
+using CloudL.Domain.DomainEvents;
 
 /// <summary>
 /// 实体标记基类（非泛型），承载领域事件容器。

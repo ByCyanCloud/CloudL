@@ -1,6 +1,6 @@
+using CloudL.Domain.Shared.Time;
 namespace CloudL.Domain.Entities;
 
-using CloudL.Domain.Shared.Time;
 
 /// <summary>
 /// 可审计实体契约。<c>FrameworkDbContext</c> 依据此接口自动填充审计字段并推进乐观锁令牌。
