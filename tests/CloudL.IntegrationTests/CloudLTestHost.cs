@@ -82,6 +82,7 @@ internal sealed class CloudLTestHost : IAsyncDisposable
                 {
                     if (useClientIpHeader)
                     {
+                        // 与真实项目一致：必须在任何读取 Request.Query 的中间件之前
                         app.Use(async (context, next) =>
                         {
                             if (context.Request.Headers.TryGetValue("X-Test-Client-IP", out var value)

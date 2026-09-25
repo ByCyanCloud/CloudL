@@ -82,11 +82,11 @@ public static class ServiceCollectionExtensions
 
         // query 参数同样采用 snake_case（与 JSON 请求/响应体、验证错误键保持一致）；
         // 同时保留 camelCase 写法，避免破坏既有调用方。
-        // query 参数：键名统一走 snake_case；含大写字母的参数名由 QueryParameterNamingFilter 直接拒绝
+        // query 参数：只支持 camelCase/PascalCase（MVC 原生大小写不敏感绑定）；snake_case 支持已移除
         services.Configure<MvcOptions>(options =>
         {
-            options.ValueProviderFactories.Insert(0, new SnakeCaseQueryValueProviderFactory());
-            options.Filters.Add<QueryParameterNamingFilter>();
+            // query 参数已改为只支持 camelCase/PascalCase：snake_case 值提供器停用（类型保留以便将来恢复）
+            // query 参数改为只支持 camelCase/PascalCase，命名校验过滤器已停用（保留类型以便将来恢复）
         });
 
         return services;

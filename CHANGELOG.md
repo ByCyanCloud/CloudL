@@ -4,6 +4,27 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.2.1] - 2026-09-25
+
+### 修复
+
+- **分页与排序在全平台不可用**（0.2.0 引入的严重缺陷）：snake_case query 键（`page_index`/`page_size`/`sort_by`/
+  `sort_direction`）对**复杂对象**（`[FromQuery] PagedRequestDto request`）一个都绑不上 —— 自定义值提供器
+  只在简单参数上生效，复杂类型绑定会按其 `BindingSource` 过滤掉它；而 camelCase 又会被命名校验拦成 400。
+
+### 变更（破坏性：query 参数命名约定调整）
+
+- query 参数**只支持 camelCase / PascalCase**（MVC 原生大小写不敏感绑定），**snake_case 支持已移除**：
+  停用了 snake_case 值提供器与"含大写字母即 400"的命名校验过滤器。
+- 响应 JSON 仍为 snake_case（两者互不影响）。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。**
+- ⚠️ **客户端需要改 query 参数名**：`?page_index=2&page_size=20&sort_by=name&sort_direction=asc`
+  → `?pageIndex=2&pageSize=20&sortBy=name&sortDirection=asc`。升级前请先改客户端，否则分页会退化为默认值。
+- **破坏性变更：是**（对依赖 snake_case query 的调用方），但这是恢复分页/排序可用性的前提。
+- 新增受测契约：复杂对象与简单参数的 query 绑定均以 camelCase 验证。
 ## [0.2.0] - 2026-09-25
 
 > 这一版把框架从"能跑"推到了"可长期依赖"：新增了限流/账号锁定/事务/请求日志，
