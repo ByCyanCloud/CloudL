@@ -1,3 +1,4 @@
+using CloudL.Domain.Shared.Time;
 using System.Reflection;
 using CloudL.Application.Contracts.IServices;
 using CloudL.Domain.DomainEvents;
@@ -166,7 +167,7 @@ public abstract class FrameworkDbContext : DbContext
     private void ApplyAuditFields()
     {
         var userId = _currentUser?.UserId;
-        var now = DateTime.UtcNow;
+        var now = CloudLTime.Now();
 
         foreach (var entry in ChangeTracker.Entries<IAuditable>())
         {
@@ -187,6 +188,23 @@ public abstract class FrameworkDbContext : DbContext
         }
     }
 
+
+    /// <summary>
+    /// 时间列一律映射为不带时区的类型（本框架不存储时区）。
+    /// </summary>
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(configurationBuilder);
+
+        base.ConfigureConventions(configurationBuilder);
+
+        // Npgsql 默认把 DateTime 映射成 timestamptz（带时区）；SQL Server 的 datetime2 本来就不带时区
+        if (Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            configurationBuilder.Properties<DateTime>().HaveColumnType("timestamp without time zone");
+            configurationBuilder.Properties<DateTime?>().HaveColumnType("timestamp without time zone");
+        }
+    }
 
     /// <summary>
     /// 为字符串列应用默认长度与 Unicode 约定。
