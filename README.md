@@ -103,7 +103,7 @@ dotnet package update CloudL.Core@0.1.0
 
 ## API 命名约定
 
-框架统一采用 **snake_case**，业务项目无需额外配置：
+请求体 / 响应体统一采用 **snake_case**；**query 参数用 camelCase**（见下表），业务项目无需额外配置：
 
 | 位置 | 约定 | 示例 |
 |---|---|---|

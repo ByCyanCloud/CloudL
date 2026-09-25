@@ -92,7 +92,7 @@ dotnet nuget add source <框架仓库路径>/local-feed -n cloudl-local
 
 ## API 命名约定
 
-框架统一使用 **snake_case**，业务控制器无需额外配置：
+请求体 / 响应体统一使用 **snake_case**；**query 参数用 camelCase**（见下表），业务控制器无需额外配置：
 
 | 位置 | 示例 |
 |---|---|
