@@ -52,15 +52,20 @@ jobs:
         run: pwsh ./build/test-check-packages.ps1
 
       - name: 依赖漏洞审计
-        shell: bash
+        shell: pwsh
         run: |
-          output=$(dotnet list CloudL.slnx package --vulnerable --include-transitive)
-          echo "$output"
-          if echo "$output" | grep -q "vulnerable packages"; then
-            echo "::error::检测到存在已知漏洞的依赖，请升级后重试"
+          $output = & dotnet list CloudL.slnx package --vulnerable --include-transitive 2>&1 | Out-String
+          $lines = @(($output -split "`n") | Where-Object { $_ -match '\S' })
+          $lines | ForEach-Object { Write-Host $_ }
+          # 只认 GHSA 编号。注意：干净输出里的英文是 has no vulnerable packages —— 含 vulnerable 一词，
+          # 按关键词判定会把"干净"误判成"有漏洞"（本步骤此前正是这样误报的）。
+          $hits = @($lines | Where-Object { $_ -match 'GHSA-' })
+          if ($hits.Count -gt 0) {
+            Write-Host '::error::检测到已知漏洞依赖：'
+            $hits | ForEach-Object { Write-Host $_ }
             exit 1
-          fi
-
+          }
+          Write-Host '无已知漏洞 ✅'
       - name: 诊断·漏洞审计原始输出（总是运行，失败时据此定位）
         if: always()
         shell: pwsh
