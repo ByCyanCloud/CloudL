@@ -4,9 +4,9 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
-## [0.2.3] - 2026-09-25
+## [0.3.0] - 2026-09-25
 
-### 变更（破坏性：时间存储与输出格式）
+### 变更（破坏性：时间存储与输出格式 + 删除公开类型）
 
 - **时间一律不存储时区**：数据库时间列改为"不带时区"类型（PostgreSQL 由 `timestamptz` 改为
   `timestamp without time zone`；SQL Server 的 `datetime2` 本来就不带）。库里存的就是墙上钟时间。
