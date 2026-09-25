@@ -4,6 +4,20 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.2.2] - 2026-09-25
+
+### 修复
+
+- **Swagger 文档与实际接口不一致**（0.2.1 遗留的**功能性**缺陷）：`SnakeCaseQueryParameterOperationFilter` 仍把
+  Swagger 里的 query 参数名改写成 snake_case，而 0.2.1 起服务端只接受 camelCase —— 照 Swagger「Try it out」
+  发出的请求会导致**分页静默失效**。现已停用该过滤器，Swagger 显示真实可用的参数名。
+- 修正随包发布的 **XML 文档注释**：`SnakeCaseQueryValueProvider` 等类型的注释此前仍写着「query 使用 snake_case、
+  含大写字母返回 400」，与 0.2.1 的行为相反（IntelliSense 中会误导使用者）。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。** 未改数据库。
+- **破坏性变更：否。** 仅修正文档与 Swagger 的一致性。
 ## [0.2.1] - 2026-09-25
 
 ### 修复

@@ -7,10 +7,10 @@ using Microsoft.Extensions.Primitives;
 namespace CloudL.AspNetCore.HttpApi.Binding;
 
 /// <summary>
-/// query 参数键的映射工具：把 snake_case 键映射为模型绑定可识别的 PascalCase 键。
-/// <para>约定：query 使用 snake_case（<c>?page_index=2&amp;sort_by=user_name</c>），
+/// 【0.2.1 起已停用】query 参数只支持 camelCase/PascalCase（MVC 原生大小写不敏感绑定）。
+/// <para>本类型仅为兼容历史引用而保留，<c>AddCloudLAspNetCore</c> 已不再注册它；计划在 0.3.0 删除。</para>
 /// 与 JSON 请求/响应体、验证错误键保持一致；<strong>不为 camelCase 提供转换通道</strong>，
-/// 含大写字母的参数名由 <c>QueryParameterNamingFilter</c> 直接拒绝（HTTP 400）。</para>
+/// <para>此处原先写着"query 使用 snake_case、含大写字母返回 400"，那是 0.2.0 及更早的行为，已随 0.2.1 失效。</para>
 /// </summary>
 public static class SnakeCaseQueryKey
 {

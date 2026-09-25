@@ -80,7 +80,7 @@ public static class ServiceCollectionExtensions
         services.AddCloudLCors(configuration);
         services.AddCloudLRateLimiting(configuration);
 
-        // query 参数同样采用 snake_case（与 JSON 请求/响应体、验证错误键保持一致）；
+        // 请求/响应体与验证错误键仍为 snake_case；query 参数自 0.2.1 起为 camelCase
         // 同时保留 camelCase 写法，避免破坏既有调用方。
         // query 参数：只支持 camelCase/PascalCase（MVC 原生大小写不敏感绑定）；snake_case 支持已移除
         services.Configure<MvcOptions>(options =>
@@ -275,8 +275,8 @@ public static class ServiceCollectionExtensions
                 }
             });
 
-            // query 参数在文档里也显示为 snake_case，保证 Swagger UI 生成的请求可直接使用
-            options.OperationFilter<SnakeCaseQueryParameterOperationFilter>();
+            // query 参数名保持原样，保证 Swagger 显示与实际可用的参数名一致
+            // 0.2.1 起 query 参数只支持 camelCase/PascalCase：不再改写 Swagger 中的参数名，
 
             foreach (var assembly in (xmlDocumentAssemblies ?? []).Where(a => a is not null).Distinct())
             {
