@@ -76,7 +76,7 @@ dotnet ef migrations add <Name> --project src/TemplateProject.EntityFrameworkCor
 dotnet new cloudl -n MyApp --frameworkVersion 1.2.0
 ```
 
-模板默认使用浮动版本（`0.1.0-*`，即 0.1 线的最新预览版），便于本地开发始终取到最新构建；
+模板默认使用浮动版本（`0.2.*`，即 0.2 线），便于本地开发始终取到最新构建；
 `Directory.Packages.props` 中已开启 `CentralPackageFloatingVersionsEnabled` 以允许此写法。
 **正式项目建议把 `CloudLVersion` 固定为具体版本**，让构建可复现。
 

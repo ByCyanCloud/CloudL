@@ -2,8 +2,78 @@
 
 本文件记录框架每个版本的变化，并对**是否需要业务侧动作**给出明确声明。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
-## [未发布]
+## [0.2.0] - 2026-09-25
+
+> 这一版把框架从"能跑"推到了"可长期依赖"：新增了限流/账号锁定/事务/请求日志，
+> 建立了四层自动化防线（API 兼容性校验、138 个测试、包内容安检、冒烟测试），
+> 并修掉了一批安全与正确性问题。**破坏性变更较多**，请按下面的「迁移影响」逐条处理。
+
+### 新增
+
+- **请求日志** `UseCloudLRequestLogging()`：每个请求一条结构化摘要（方法、路径、脱敏后的 query、状态码、耗时、TraceId、客户端 IP、用户名）；`/health`、`/swagger`、`/favicon.ico` 降级为 Verbose。
+- **IP 维度限流** `AddCloudLRateLimiting()`：认证类接口用 `[EnableRateLimiting(RateLimitPolicies.Auth)]` 开启；被限流返回**框架统一响应体**（`status_code = 4290`）并带 `Retry-After`；IPv6 按 `/64` 前缀聚合（否则换源地址即可绕过）。
+- **账号维度锁定** `ILoginAttemptGuard`：连续登录失败达到阈值后临时锁定（默认 5 次 / 锁定 60 秒），返回 429 + 业务码 `4291`；用户名大小写不敏感；带清理节流与跟踪量硬上限，防止被海量用户名撑爆内存。
+- **事务助手** `IUnitOfWork.ExecuteInTransactionAsync(...)`：把多次写入包进一个事务，任一步失败整体回滚；支持嵌套（复用最外层事务）；内部走执行策略，兼容 `EnableRetryOnFailure`；**领域事件在事务提交后才分发**，回滚不留事件。
+- **query 参数命名校验**：只接受 snake_case（含大写字母直接返回 400），Swagger 文档同步显示 snake_case；同时新增 snake_case 绑定支持。
+- **数据库提供程序拆包**：`CloudL.EntityFrameworkCore` 变为**与数据库无关**，提供程序独立为 `CloudL.EntityFrameworkCore.PostgreSql` 与 `CloudL.EntityFrameworkCore.SqlServer`（消费方不再被拖入用不到的提供程序依赖，实测减少 12 个 DLL / 4 MB）。
+- **公开 API 兼容性守卫**：打包时与上一个已发布版本比对公开 API 面（底层 ApiCompat），破坏性变更即失败，除非登记到 `CompatibilitySuppressions.xml`（即契约变更台账）。
+- **集成测试基座**：TestServer（真实 MVC 管道）+ SQLite 内存库；测试总数 20 → **138**。
+- **包内容安检** `build/check-packages.ps1`：禁止配置/证书/私钥混入包，并有规则自测（防止安检静默失效）。
+- **模板比对工具** `build/compare-template.ps1`：用当前模板重新生成同名项目，列出"框架装配"文件的差异（模板是复制而非依赖，升级包不会更新它们）。
+- **`.editorconfig`**（框架仓库 + 模板）：让代码风格由仓库而非各人 IDE 设置决定。
+- **`CONTRACT.md` 对外契约**：契约分级、13 个接口的替换语义、配置键清单、行为约定、数据库约定、升级步骤。
+
+### 变更
+
+- 统一响应中的**字典键不再被改写**：以前会把响应里所有字典的键转成 snake_case（业务字典 `{"USD":"美元"}` 会被改成 `usd`，属语义损坏）。
+- **异常映射收紧**：只有框架定义的业务异常才把消息透传给调用方；其它（含 BCL 的 `ArgumentException`、`InvalidOperationException`、`KeyNotFoundException`）一律 500 + 通用消息。
+- **新增异常类型** `NotFoundException`（404）与 `ForbiddenBusinessException`（403），`TooManyRequestsException`（429）；异常→状态码映射表见 README。
+- 日志级别改为**由映射出的状态码推导**（5xx→Error，4xx→Warning），不再维护第二份"预期异常清单"。
+- 健康检查 `/health` 改为**匿名可访问**（此前 FallbackPolicy 会让探针拿到 401）。
+- 请求体缓冲收窄：只在"非 multipart、非分块、且体积可控"时启用，避免为上传额外落一份临时文件。
+- `SaveChanges` 只遍历一次变更跟踪器（顺带修掉"被删除实体的事件残留"）。
+- 框架自身启用**零警告策略**（`TreatWarningsAsErrors`，NuGet 审计类警告除外）。
+- 发布工作流：手动触发必须显式指定一个已存在的 `v*` 标签（此前手动触发会算出预览版本并真的推送到 nuget.org）。
+- 框架包新增依赖 `Serilog.AspNetCore 8.0.3`（请求日志用；与模板保持一致）。
+
+### 修复
+
+- **分页排序缺少次级排序键**：并列 `created_at` 时翻页会重复或漏行 → 自动追加主键。
+- **日志脱敏存在覆盖漏洞**：键名比较不忽略 `_`/`-`，导致 `access_token`、`client_secret`、`api-key` 等未被遮蔽 → 现在忽略分隔符，且新增"按值形态识别"（JWT、≥40 位不透明令牌）；query 串同样脱敏并截断。
+- 脱敏后的日志会把中文转义成 `\uXXXX` → 已改用不转义编码器。
+- 事务助手在**延迟范围内**分发事件，导致处理器内部触发的事件被静默丢弃 → 改为先结束延迟范围再分发。
+- 登录失败计数的清理：高基数时每次失败都全表扫描（CPU 放大）、且活跃攻击下内存无上限 → 加时间节流（默认 30 秒）与跟踪量硬上限（默认 20 万，超出按最久未活动淘汰）。
+- 分块传输（`ContentLength` 为 null）的请求仍被缓冲，使"收窄"失效 → 已排除。
+- README 包一览只列 3 个包、且写着不存在的 API（`AddFrameworkDbContext`、`AddFramework`）→ 已更正为 6 个包与实际 API 名。
+
+### 迁移影响
+
+**需要业务侧新增 EF 迁移：否**（本版没有改动列名、默认长度等数据库约定）。
+
+**破坏性变更：是。** 逐条如下（⭐ 表示必须处理）：
+
+| # | 变更 | 业务侧要做的事 |
+|---|---|---|
+| ⭐ 1 | 数据库提供程序拆包，`UseCloudLDatabaseProvider` 与提供程序名常量**已删除** | EF 项目加 `CloudL.EntityFrameworkCore.PostgreSql`（或 `.SqlServer`）包；装配处改为 `services.AddCloudLEntityFrameworkCore<AppDbContext>(options => options.UseCloudLPostgreSql(connectionString))`；`DesignTimeDbContextFactory` 同步；`Database:Provider` 配置键不再使用 |
+| ⭐ 2 | `AddCloudLEntityFrameworkCore(IConfiguration)` 与 `(string, string)` 重载**已删除** | 改用接收 `Action<DbContextOptionsBuilder>` 的重载（见上一条） |
+| ⭐ 3 | `IRepository<,>.GetAllAsync` 与 `AppConstants.MaxGetAllCount`**已删除** | 改用 `GetPagedAsync`（旧接口会静默截断到 1000 行，属陷阱 API） |
+| ⭐ 4 | query 参数**含大写字母直接返回 400** | 客户端改用 snake_case（如 `?pageIndex=2` → `?page_index=2`） |
+| ⭐ 5 | 响应中的**字典键不再被改写** | 若客户端依赖旧的"字典键被转成 snake_case"行为，需要适配 |
+| 6 | `IUnitOfWork` 新增两个成员 | 仅影响**自行实现**该接口的项目（只使用它则不受影响） |
+| 7 | 异常映射收紧：`ArgumentException` / `InvalidOperationException` / `KeyNotFoundException` 不再映射为 400/404 并透传消息 | 若业务代码靠抛这些异常表达"参数错误/资源不存在"，改用 `BusinessException` / `NotFoundException` / `ForbiddenBusinessException` |
+| 8 | 模板改用 `NotFoundException` / `ForbiddenBusinessException` | 若你拷贝过模板的 `UserService`，把 `KeyNotFoundException` 与 `UnauthorizedBusinessException(ErrorCodes.Forbidden, …)` 换成新类型 |
+| 9 | `/health` 改为匿名 | 若你**有意**让它需要认证，需自行加回授权要求 |
+| 10 | 框架包新增 `Serilog.AspNetCore` 依赖 | 若你的项目用其它日志库，会多带一个 Serilog 依赖（可接受） |
+
+**升级步骤**见 `CONTRACT.md` 第 7 节；其中第 4 步（同步模板装配文件）可用：
+
+```powershell
+pwsh ./build/compare-template.ps1 -ProjectPath <你的项目根目录>
+```
+
+## [0.1.0] - 2026-09-24
 
 ### 新增
 - 框架从单体模板改造为 NuGet 包：`CloudL.Core`、`CloudL.EntityFrameworkCore`、`CloudL.AspNetCore`。
@@ -23,4 +93,4 @@
 
 ### 迁移影响
 - **需要业务侧新增 EF 迁移**：是。全局字符串约定修复会改变列长度（如 `code` → `string(32)`、`password_hash` → `string(512)`）。
-- **破坏性变更**：是。命名空间与配置绑定方式变化，详见升级指南。
+- **破坏性变更**：是。命名空间与配置绑定方式变化。
