@@ -59,7 +59,7 @@ CloudL/
 ├── build/pack.ps1                 # 打包脚本：pack + 推本地源 + 装模板
 ├── src/                           # 三个框架包
 ├── tests/                         # 单元测试 + 模板冒烟测试
-├── template/                      # dotnet new 模板（九层业务骨架）
+├── packaging/CloudL.Templates/    # dotnet new 模板包（内容为 template/，九层业务骨架）
 └── local-feed/                    # 本机 NuGet 源（打包输出）
 ```
 
@@ -215,3 +215,19 @@ services.AddCloudLEntityFrameworkCore<AppDbContext>(options =>
   （实测多余程序集约 1.5 MB，还多一份安全面与还原时间）。
 - 提供程序在**代码里显式选择**，而不是靠配置里的名字字符串 —— 用错会在编译期暴露，而不是运行期。
 - `GetRequiredConnectionString()` 在连接串缺失或为空白时给出明确的配置路径，而不是等到第一次访问数据库。
+
+## 模板包（dotnet new）
+
+业务项目骨架以**模板包**形式发布，任何机器上一条命令即可使用：
+
+```bash
+dotnet new install CloudL.Templates
+dotnet new cloudl -n MyCompany.BookStore -o ./BookStore
+```
+
+- 包 ID `CloudL.Templates`，短名 `cloudl`，模板标识 `CloudL.WebApi`；
+- 用 `--frameworkVersion 0.x.*` 可以指定生成的业务项目引用哪个框架版本；
+- 升级模板：先 `dotnet new uninstall CloudL.Templates`，再重新 install；
+- 本仓库开发时不必手动安装：`pwsh ./build/pack.ps1` 打完包会**从包安装**模板；
+- 冒烟测试同样从包安装，因此每次 CI 都在验证**打包结果本身**可用（而不是只验证源码目录）。
+

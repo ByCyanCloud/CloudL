@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+
+    <!-- 模板包：内容就是本目录下的 template/，没有程序集，也没有公开 API -->
+    <PackageType>Template</PackageType>
+    <PackageId>CloudL.Templates</PackageId>
+    <Title>CloudL DDD Web API 模板</Title>
+    <Description>CloudL DDD 框架的 dotnet new 模板（九层业务骨架）。安装：dotnet new install CloudL.Templates；生成项目：dotnet new cloudl -n MyCompany.BookStore。</Description>
+    <PackageTags>dotnet-new;templates;ddd;webapi;cloudl</PackageTags>
+    <IsPackable>true</IsPackable>
+
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+
+    <!--
+      必须关掉符号包：框架的 Directory.Build.props 全局开了 IncludeSymbols，
+      而模板包没有程序集，符号包必然为空 —— 那会让打包以 NU5017（"既无依赖项也无内容"）失败，
+      且错误信息极具误导性，看起来像是"内容没进包"。
+    -->
+    <IncludeSymbols>false</IncludeSymbols>
+
+    <!--
+      NuGet 默认排除"以 . 开头的文件/文件夹"，而模板的 .template.config/template.json 正是点开头的 ——
+      不打开这个开关，打出来的包会缺少模板定义，装上去等于没有模板（NU5119 会提醒你）。
+    -->
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+
+    <!-- 模板包没有公开 API 可供比对，关闭包校验（ApiCompat 只对库包有意义） -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+
+    <!-- 没有 lib/ref 与 TFM 依赖组，NU5128 不适用 -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      用 None + Pack=true 入包：这是本仓库已经被验证可行的路径
+      —— 根目录的 Directory.Build.props 正是用同样写法把 README.md 打进各包的
+      （SDK 的 NuGet.Build.Tasks.Pack.targets 中 _PackageFiles 明确收集 "%(None.Pack) == 'true'"）。
+    -->
+    <None Remove="template\**\*" />
+    <None Include="template\**\*"
+          Exclude="template\**\bin\**;template\**\obj\**;template\**\.vs\**"
+          Pack="true"
+          PackagePath="content\CloudL.WebApi\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <!-- 模板源码不参与本打包项目的编译（否则 47 个业务 .cs 会被当成这个项目的源码） -->
+    <Compile Remove="**\*" />
+  </ItemGroup>
+
+</Project>

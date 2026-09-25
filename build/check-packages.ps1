@@ -54,16 +54,33 @@ $forbiddenFilePatterns = @(
     '*.rdp'
 )
 
-# 禁止出现在文本条目内容里的“真凭据”特征：
-# 关键字后面必须跟着一个足够长的不透明值，才算真凭据（单纯提词不算）。
+# 禁止出现在文本条目内容里的“真凭据”特征。
+# 关键字后面（可隔一个引号，兼容 JSON 属性写法）必须跟一个足够长的不透明值，才算真凭据。
 $forbiddenContentPatterns = @(
     'BEGIN PRIVATE KEY',
     'BEGIN RSA PRIVATE KEY',
     'BEGIN OPENSSH PRIVATE KEY',
     'BEGIN CERTIFICATE',
-    '(?i)(password|passwd|pwd|secret|secretkey|apikey|accountkey|sharedaccesskey|client_secret|connectionstring)\s*[=:]\s*[\x22\x27]?[A-Za-z0-9+/_\-\.]{12,}',
+    '(?i)(password|passwd|pwd|secret|secretkey|apikey|accountkey|sharedaccesskey|client_secret|connectionstring)[\x22\x27]?\s*[=:]\s*[\x22\x27]?[A-Za-z0-9+/_\-\.]{12,}',
     '(?i)(AccountKey|SharedAccessKey|sig)=[A-Za-z0-9%+/_\-]{20,}'
 )
+
+# 模板包按设计就包含 appsettings*.json（占位配置，值为空或明显占位符），
+# 因此只对它们豁免“文件名规则”；<strong>内容规则照旧生效</strong> ——
+# 真凭据被粘进模板的 appsettings 里，一样会被拦下。
+$templatePackageIds = @('CloudL.Templates')
+
+function Test-IsTemplatePackage {
+    param([Parameter(Mandatory)][string]$PackageName)
+
+    foreach ($packageId in $templatePackageIds) {
+        if ($PackageName -like "$packageId.*") {
+            return $true
+        }
+    }
+
+    return $false
+}
 
 $violations = [System.Collections.Generic.List[string]]::new()
 $packages = @(Get-ChildItem -Path $FeedPath -Filter '*.nupkg' -File)
@@ -75,15 +92,18 @@ if ($packages.Count -eq 0) {
 foreach ($package in $packages) {
     Write-Host "==> 安检 $($package.Name)" -ForegroundColor Cyan
 
+    $isTemplatePackage = Test-IsTemplatePackage -PackageName $package.Name
     $zip = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
 
     try {
         foreach ($entry in $zip.Entries) {
             $fileName = [System.IO.Path]::GetFileName($entry.FullName)
 
-            foreach ($pattern in $forbiddenFilePatterns) {
-                if ($fileName -like $pattern) {
-                    $violations.Add("$($package.Name)：含禁止文件 $($entry.FullName)")
+            if (-not $isTemplatePackage) {
+                foreach ($pattern in $forbiddenFilePatterns) {
+                    if ($fileName -like $pattern) {
+                        $violations.Add("$($package.Name)：含禁止文件 $($entry.FullName)")
+                    }
                 }
             }
 

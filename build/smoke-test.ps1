@@ -26,7 +26,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$templatePath = Join-Path $repoRoot 'template'
+$templatePath = Join-Path $repoRoot 'packaging/CloudL.Templates/template'
 $projectName = 'SmokeTest'
 
 if (-not $OutputDir) {
@@ -51,11 +51,24 @@ if (-not $SkipPack) {
     Assert-LastExitCode '打包'
 }
 
-# ---------- 2. 安装模板 ----------
-Write-Step '安装 dotnet new 模板'
+# ---------- 2. 安装模板（从刚打出的包安装，顺带验证打包结果本身可用） ----------
+Write-Step '从包安装 dotnet new 模板'
+
+$templatePackage = Get-ChildItem (Join-Path $repoRoot 'local-feed') -Filter 'CloudL.Templates.*.nupkg' -File |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+
+if (-not $templatePackage) {
+    throw 'local-feed 中没有 CloudL.Templates 包，请先执行打包。'
+}
+
+$templateVersion = $templatePackage.Name.Substring('CloudL.Templates.'.Length).Replace('.nupkg', '')
+Write-Host "使用模板包版本: $templateVersion" -ForegroundColor Yellow
+
 & dotnet new uninstall $templatePath 2>&1 | Out-Null
-& dotnet new install $templatePath
-Assert-LastExitCode '安装模板'
+& dotnet new uninstall CloudL.Templates 2>&1 | Out-Null
+& dotnet new install "CloudL.Templates::$templateVersion"
+Assert-LastExitCode '从包安装模板'
 
 # ---------- 3. 生成业务项目 ----------
 Write-Step "生成业务项目 $projectName"

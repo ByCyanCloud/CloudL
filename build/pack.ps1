@@ -6,7 +6,7 @@
 .DESCRIPTION
     1. 依次打包 src/ 下的三个框架项目到 local-feed（或 -FeedPath 指定的目录）；
     2. 可选：推送到远程源（GitHub Packages / nuget.org）；
-    3. 可选：重装 template/ 下的 dotnet new 模板，使 `dotnet new cloudl` 可用。
+    3. 可选：从刚打出的 CloudL.Templates 包安装 dotnet new 模板，使 `dotnet new cloudl` 可用。
 
 .PARAMETER Configuration
     构建配置，默认 Release。
@@ -101,7 +101,8 @@ $projects = @(
     'src/CloudL.EntityFrameworkCore/CloudL.EntityFrameworkCore.csproj',
     'src/CloudL.EntityFrameworkCore.PostgreSql/CloudL.EntityFrameworkCore.PostgreSql.csproj',
     'src/CloudL.EntityFrameworkCore.SqlServer/CloudL.EntityFrameworkCore.SqlServer.csproj',
-    'src/CloudL.AspNetCore/CloudL.AspNetCore.csproj'
+    'src/CloudL.AspNetCore/CloudL.AspNetCore.csproj',
+    'packaging/CloudL.Templates/CloudL.Templates.csproj'
 )
 
 Write-Host "==> 输出目录: $FeedPath" -ForegroundColor Cyan
@@ -126,9 +127,11 @@ foreach ($project in $projects) {
     }
 }
 
+# 每个包 ID 取最新一个：包数会随框架增长，写死数量迟早会漏掉
 $produced = Get-ChildItem -Path $FeedPath -Filter 'CloudL.*.nupkg' -File |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 3
+    Group-Object { if ($_.Name -match '^(CloudL\..+?)\.\d+\.\d+') { $Matches[1] } else { $_.Name } } |
+    ForEach-Object { $_.Group | Sort-Object LastWriteTime -Descending | Select-Object -First 1 } |
+    Sort-Object Name
 
 if ($produced.Count -eq 0) {
     throw "未在 $FeedPath 找到任何 CloudL.*.nupkg，请检查打包输出。"
@@ -154,24 +157,28 @@ if ($PushSource) {
 }
 
 if (-not $SkipTemplateInstall) {
-    $templatePath = Join-Path $repoRoot 'template'
+    Write-Host "==> 重装 dotnet new 模板（从本次打出的包安装，与使用者的安装路径完全一致）" -ForegroundColor Cyan
 
-    if (Test-Path $templatePath) {
-        Write-Host "==> 重装 dotnet new 模板" -ForegroundColor Cyan
+    $templatePackage = Get-ChildItem -Path $FeedPath -Filter 'CloudL.Templates.*.nupkg' -File |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
 
-        # 先卸载旧版本（未安装时返回非零，属正常情况）
-        & dotnet new uninstall $templatePath 2>&1 | Out-Null
-
-        & dotnet new install $templatePath
-        if ($LASTEXITCODE -ne 0) {
-            throw "模板安装失败: $templatePath"
-        }
-
-        Write-Host "==> 模板已就绪：dotnet new cloudl -n MyApp" -ForegroundColor Green
+    if (-not $templatePackage) {
+        throw "未在 $FeedPath 找到 CloudL.Templates 包，无法安装模板。"
     }
-    else {
-        Write-Warning "未找到模板目录，已跳过：$templatePath"
+
+    $templateVersion = $templatePackage.Name.Substring('CloudL.Templates.'.Length).Replace('.nupkg', '')
+
+    # 源码目录安装与包安装会互相冲突，两种都先卸掉（未安装时返回非零，属正常情况）
+    & dotnet new uninstall (Join-Path $repoRoot 'packaging/CloudL.Templates/template') 2>&1 | Out-Null
+    & dotnet new uninstall CloudL.Templates 2>&1 | Out-Null
+
+    & dotnet new install "CloudL.Templates::$templateVersion"
+    if ($LASTEXITCODE -ne 0) {
+        throw "模板安装失败: CloudL.Templates::$templateVersion"
     }
+
+    Write-Host "==> 模板已就绪（$templateVersion）：dotnet new cloudl -n MyApp" -ForegroundColor Green
 }
 
 Write-Host "==> 完成" -ForegroundColor Green

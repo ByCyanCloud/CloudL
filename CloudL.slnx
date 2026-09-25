@@ -6,6 +6,9 @@
     <Project Path="src/CloudL.EntityFrameworkCore.PostgreSql/CloudL.EntityFrameworkCore.PostgreSql.csproj" />
     <Project Path="src/CloudL.EntityFrameworkCore.SqlServer/CloudL.EntityFrameworkCore.SqlServer.csproj" />
   </Folder>
+  <Folder Name="/packaging/">
+    <Project Path="packaging/CloudL.Templates/CloudL.Templates.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/CloudL.UnitTests/CloudL.UnitTests.csproj" />
     <Project Path="tests/CloudL.IntegrationTests/CloudL.IntegrationTests.csproj" />
