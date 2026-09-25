@@ -103,22 +103,16 @@ dotnet package update CloudL.Core@0.1.0
 
 ## API 命名约定
 
-请求体 / 响应体统一采用 **snake_case**；**query 参数用 camelCase**（见下表），业务项目无需额外配置：
+请求体 / 响应体统一采用 snake_case；**query 参数用 camelCase**（**0.2.1 起 query 参数只支持 camelCase / PascalCase**，snake_case 支持已移除）：
 
 | 位置 | 约定 | 示例 |
 |---|---|---|
 | JSON 请求体 / 响应体 | snake_case | `{"user_name":"alice","row_version":"..."}` |
-Query 参数：只支持 **camelCase**（如 `pageIndex`、`pageSize`、`sortBy`、`sortDirection`）；MVC 大小写不敏感，PascalCase 亦可；**不再支持 snake_case**。
+| **Query 参数** | **camelCase**（MVC 大小写不敏感，PascalCase 亦可） | `?pageIndex=2&pageSize=20&sortBy=name&sortDirection=asc` |
 | 验证错误键 | snake_case | `{"errors":{"page_index":["页码必须大于等于 1"]}}` |
 | 业务字典的键 | **原样保留**（不做转换，避免 `USD` → `usd` 这类语义损坏） | `{"USD":"美元"}` |
-Query 参数：只支持 **camelCase**（如 `pageIndex`、`pageSize`、`sortBy`、`sortDirection`）；MVC 大小写不敏感，PascalCase 亦可；**不再支持 snake_case**。
 
-实现：`CloudLJson`（JSON）、`SnakeCaseQueryValueProviderFactory`（query 绑定）、
-`SnakeCaseQueryParameterOperationFilter`（Swagger），由 `AddCloudLAspNetCore` 自动接入。
-
-> 说明：`QueryParameterNamingFilter` 会校验 query 参数名 —— **含大写字母（camelCase / PascalCase）时直接返回 400**，
-> 并在响应中列出不合法的参数名；键允许的字符为小写字母、数字、下划线、点（嵌套分隔）与连字符。
-> 这样做是为了避免"参数名不匹配 → 静默使用默认值 → 调用方拿到错误结果却没有任何提示"。
+实现：JSON 由 `CloudLJson` 统一配置；query 参数由 MVC 原生的、大小写不敏感的绑定完成。
 
 ## 日志约定
 

@@ -84,6 +84,18 @@ jobs:
           # nuget.org 的用户名（profile name），不是邮箱；请在仓库 Secrets 中配置
           user: ${{ secrets.NUGET_USER }}
 
+      - name: 校验待发布包的版本与标签一致
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.tag || github.ref_name }}".TrimStart('v')
+          $packages = @(Get-ChildItem local-feed -Filter *.nupkg -File)
+          if ($packages.Count -eq 0) { throw 'local-feed 里没有待发布的包' }
+          $packages | ForEach-Object { Write-Host "  待发布: $($_.Name)" }
+          $bad = @($packages | Where-Object { $_.Name -notlike "*$tag.nupkg" })
+          if ($bad.Count -gt 0) {
+            throw "以下包版本与标签 $tag 不一致：$($bad.Name -join ', ') —— 拒绝发布"
+          }
+          Write-Host "全部包版本与标签 $tag 一致 ✅"
       - name: 推送到 nuget.org
         shell: bash
         run: |

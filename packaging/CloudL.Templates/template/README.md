@@ -92,15 +92,16 @@ dotnet nuget add source <框架仓库路径>/local-feed -n cloudl-local
 
 ## API 命名约定
 
-请求体 / 响应体统一使用 **snake_case**；**query 参数用 camelCase**（见下表），业务控制器无需额外配置：
+请求体 / 响应体统一使用 snake_case；**query 参数用 camelCase**（**0.2.1 起 query 参数只支持 camelCase / PascalCase**，snake_case 支持已移除）：
 
-| 位置 | 示例 |
-|---|---|
-| JSON 请求体 / 响应体 | `{"user_name":"alice","row_version":"..."}` |
-| Query 参数 | `?page_index=2&page_size=50&sort_by=user_name&sort_direction=asc` |
-| 验证错误键 | `{"errors":{"page_index":["页码必须大于等于 1"]}}` |
+| 位置 | 约定 | 示例 |
+|---|---|---|
+| JSON 请求体 / 响应体 | snake_case | `{"user_name":"alice","row_version":"..."}` |
+| **Query 参数** | **camelCase**（MVC 大小写不敏感，PascalCase 亦可） | `?pageIndex=2&pageSize=20&sortBy=name&sortDirection=asc` |
+| 验证错误键 | snake_case | `{"errors":{"page_index":["页码必须大于等于 1"]}}` |
+| 业务字典的键 | **原样保留**（不做转换，避免 `USD` → `usd` 这类语义损坏） | `{"USD":"美元"}` |
 
-- Query 参数：只支持 **camelCase**（如 `pageIndex`、`pageSize`、`sortBy`、`sortDirection`）；MVC 大小写不敏感，PascalCase 亦可；**不再支持 snake_case**。
+实现：JSON 由 `CloudLJson` 统一配置；query 参数由 MVC 原生的、大小写不敏感的绑定完成。
 
 ## 必须修改的配置
 
