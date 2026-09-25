@@ -1,5 +1,7 @@
 namespace CloudL.Domain.Entities;
 
+using CloudL.Domain.Shared.Time;
+
 /// <summary>
 /// 可审计实体契约。<c>FrameworkDbContext</c> 依据此接口自动填充审计字段并推进乐观锁令牌。
 /// </summary>
@@ -44,7 +46,8 @@ public abstract class AuditableEntity<TKey> : Entity<TKey>, IAuditable
     }
 
     /// <summary>标记实体已被修改（设置 UpdatedAt）。</summary>
-    protected void MarkAsUpdated() => UpdatedAt = DateTime.UtcNow;
+    /// <remarks>用 <c>CloudLTime.Now()</c>：时间列不带时区，写 <c>Kind=Utc</c> 会被 Npgsql 拒绝。</remarks>
+    protected void MarkAsUpdated() => UpdatedAt = CloudLTime.Now();
 
     /// <summary>设置创建人。</summary>
     protected void SetCreatedBy(Guid userId) => CreatedBy = userId;
@@ -72,7 +75,8 @@ public abstract class AuditableEntity : Entity, IAuditable
     }
 
     /// <summary>标记实体已被修改（设置 UpdatedAt）。</summary>
-    protected void MarkAsUpdated() => UpdatedAt = DateTime.UtcNow;
+    /// <remarks>用 <c>CloudLTime.Now()</c>：时间列不带时区，写 <c>Kind=Utc</c> 会被 Npgsql 拒绝。</remarks>
+    protected void MarkAsUpdated() => UpdatedAt = CloudLTime.Now();
 
     /// <summary>设置创建人。</summary>
     protected void SetCreatedBy(Guid userId) => CreatedBy = userId;

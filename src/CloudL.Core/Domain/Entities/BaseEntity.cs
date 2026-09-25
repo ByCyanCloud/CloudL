@@ -1,6 +1,7 @@
 namespace CloudL.Domain.Entities;
 
 using CloudL.Domain.DomainEvents;
+using CloudL.Domain.Shared.Time;
 
 /// <summary>
 /// 实体标记基类（非泛型），承载领域事件容器。
@@ -30,7 +31,7 @@ public abstract class BaseEntity
 /// </summary>
 public abstract class Entity : BaseEntity
 {
-    /// <summary>创建时间（UTC）。</summary>
+    /// <summary>创建时间（按 <c>Time:Clock</c> 口径的墙上钟，<c>Kind=Unspecified</c>）。</summary>
     public DateTime CreatedAt { get; protected set; }
 
     /// <summary>并发令牌（乐观锁）。</summary>
@@ -38,7 +39,9 @@ public abstract class Entity : BaseEntity
 
     protected Entity()
     {
-        CreatedAt = DateTime.UtcNow;
+        // 必须用 CloudLTime：框架不存储时区，时间列是 timestamp without time zone，
+        // 写 Kind=Utc 会被 Npgsql 拒绝（Cannot write DateTime with Kind=UTC to ...）。
+        CreatedAt = CloudLTime.Now();
     }
 }
 
