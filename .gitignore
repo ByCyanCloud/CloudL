@@ -38,3 +38,9 @@ Thumbs.db
 ## 本地配置（含密钥，禁止提交）
 appsettings.Local.json
 *.env
+
+# local-feed 目录本身要随仓库存在（nuget.config 指向它），只忽略包文件：
+# 注意：目录被排除后 git 不会进入，必须先在目录层解除排除，文件级例外才生效
+!local-feed/
+local-feed/*
+!local-feed/.gitkeep
