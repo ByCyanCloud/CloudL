@@ -14,7 +14,6 @@
       0.2.0 发布之后请删除下面这一行，让它继承 Directory.Build.props 里的基线版本，
       这样它的公开 API 也会受兼容性守卫约束。
     -->
-    <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>
