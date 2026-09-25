@@ -119,3 +119,27 @@ jobs:
           done
 
           echo "==> 已尝试推送 ${#files[@]} 个文件"
+
+      - name: 校验已发布（轮询包索引，未出现即失败）
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.tag || github.ref_name }}".TrimStart('v')
+          $urls = @(
+            'https://api.nuget.org/v3-flatcontainer/cloudl.core/index.json',
+            'https://api.nuget.org/v3-flatcontainer/cloudl.templates/index.json'
+          )
+          foreach ($url in $urls) {
+            $found = $false
+            for ($i = 1; $i -le 30; $i++) {
+              try {
+                $index = Invoke-RestMethod -Uri $url -TimeoutSec 30
+                if ($index.versions -contains $tag) { $found = $true; break }
+              } catch { }
+              Start-Sleep -Seconds 20
+            }
+            if (-not $found) {
+              Write-Host "::error::$url 在 10 分钟内仍未出现版本 $tag —— 说明 push 步骤实际没有推送成功"
+              exit 1
+            }
+            Write-Host "$url 已包含 $tag ✅"
+          }
