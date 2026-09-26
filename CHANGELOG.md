@@ -4,6 +4,23 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.3.1] - 2026-09-25
+
+### 修复
+
+- **Swagger 文档里的 query 参数名显示为 PascalCase**，与对外约定（camelCase）不一致：0.2.2 停用了旧的
+  snake_case 改写过滤器，却没有补上 camelCase，于是文档退回显示 C# 原名。现已新增
+  `CamelCaseQueryParameterOperationFilter`，文档显示 `pageIndex`。
+  （query 的**实际绑定一直是大小写不敏感的**，所以这不影响能否调用，只影响文档可读性。）
+
+### 变更
+
+- 包校验基线更新为 `0.3.0`，并清理了相对旧基线的抑制条目。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。**
+- **破坏性变更：否。** 仅文档显示与构建配置调整。
 ## [0.3.0] - 2026-09-25
 
 ### 变更（破坏性：时间存储与输出格式 + 删除公开类型）
