@@ -60,7 +60,7 @@
       每次发布后更新基线版本。
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>0.2.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>0.3.0</PackageValidationBaselineVersion>
 
     <!-- 默认不打包：仅 src/ 下的框架项目显式打开 IsPackable -->
     <IsPackable>false</IsPackable>
