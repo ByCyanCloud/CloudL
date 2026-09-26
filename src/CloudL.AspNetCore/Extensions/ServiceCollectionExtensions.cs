@@ -1,3 +1,4 @@
+using CloudL.AspNetCore.HttpApi.Swagger;
 using CloudL.Domain.Shared.Time;
 using System.Net.Http.Headers;
 using System.Reflection;
@@ -253,6 +254,8 @@ public static class ServiceCollectionExtensions
 
         services.AddSwaggerGen(options =>
         {
+            // query 参数在文档里显示为 camelCase（绑定本身大小写不敏感，这里只为与对外约定一致）
+            options.OperationFilter<CamelCaseQueryParameterOperationFilter>();
             options.SwaggerDoc("v1", new OpenApiInfo
             {
                 Title = title,
