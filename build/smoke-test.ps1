@@ -23,6 +23,10 @@ param(
     [string]$OutputDir
 )
 
+# 用独立的包目录：框架重新打包但版本号未变时，全局缓存会让生成的项目链接到旧副本，
+# 造成"冒烟通过、实际测的是旧二进制"这类极难发现的假绿。
+$env:NUGET_PACKAGES = Join-Path $PSScriptRoot '../artifacts/smoke-packages'
+
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path

@@ -4,6 +4,31 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.4.1] - 2026-09-27
+
+### 新增
+
+- **启动时输出运行环境与监听地址**：由 `AddCloudLAspNetCore` 自动注册（**零配置**，业务项目无需改
+  `Program.cs`），在 `ApplicationStarted`（服务器**已开始监听之后**）输出一行，例如：
+  `服务已启动 —— 应用=MyApp，运行环境=Production（生产环境），监听地址：http://0.0.0.0:10003`。
+
+### 修复
+
+- **日志排版**：块状日志的换行从"消息开头"改为由**输出模板最前面的 `{NewLine}`** 产生 ——
+  原先那个换行会落在 Serilog 的 `[级别]` 前缀之后，导致**前缀独占一行、标题与正文分离**。
+  模板项目已默认改好；**项目自带的 `appsettings.json` 需要自行调整**（见迁移影响）。
+
+### 其它
+
+- 冒烟测试改用**独立 NuGet 包目录**，避免"框架重新打包但版本号未变"时链接到全局缓存里的旧副本
+  ——那会造成"冒烟通过、实际测的是旧二进制"的假绿。
+- 新增集成测试：用真实宿主 + 捕获 logger 断言启动信息确实被输出（可长期回归）。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。破坏性变更：否。**
+- ⚠️ 若要日志"每条之前一个空行"，请在自己的 `appsettings.json` 里把 Serilog 的 `outputTemplate`
+  改成以 `{NewLine}` 开头（模板项目已默认改好）。
 ## [0.4.0] - 2026-09-27
 
 ### 变更（破坏性：依赖大版本升级）
