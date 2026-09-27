@@ -56,6 +56,25 @@ public sealed class TimeOptions
     }
 
     /// <summary>
+    /// 把 <see cref="DateTime"/> 换算成本口径的墙上钟时间。
+    /// </summary>
+    /// <remarks>
+    /// <para><strong><see cref="DateTimeKind.Unspecified"/> 必须放在最前面判断</strong>：
+    /// 它本身就是"墙上钟"（库里读回来的就是这种），直接原样返回即可。</para>
+    /// <para>若把它交给 <c>new DateTimeOffset(value)</c>，会被<strong>当作服务器本地时间</strong>处理，
+    /// 于是又套了一层偏移 —— 墙上钟就被算错了。只有 <c>Utc</c> / <c>Local</c> 才携带偏移信息、
+    /// 可以交给 <see cref="ToWallClock(DateTimeOffset)"/> 做无损换算。</para>
+    /// </remarks>
+    public DateTime ToWallClock(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Unspecified => value,
+        _ => ToWallClock(new DateTimeOffset(value))
+    };
+
+    /// <summary><see cref="Nullable{DateTime}"/> 版本。</summary>
+    public DateTime? ToWallClock(DateTime? value) => value.HasValue ? ToWallClock(value.Value) : null;
+
+    /// <summary>
     /// 解析固定偏移。
     /// </summary>
     /// <remarks>
@@ -96,4 +115,10 @@ public static class CloudLTime
 
     /// <summary>把带偏移的时间换算成当前口径的墙上钟时间。</summary>
     public static DateTime ToWallClock(DateTimeOffset value) => _current.ToWallClock(value);
+
+    /// <summary>把 <see cref="DateTime"/> 换算成当前口径的墙上钟时间（<c>Unspecified</c> 原样返回）。</summary>
+    public static DateTime ToWallClock(DateTime value) => _current.ToWallClock(value);
+
+    /// <summary><see cref="Nullable{DateTime}"/> 版本。</summary>
+    public static DateTime? ToWallClock(DateTime? value) => _current.ToWallClock(value);
 }

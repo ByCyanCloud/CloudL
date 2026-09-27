@@ -131,6 +131,26 @@ public abstract class FrameworkDbContext : DbContext
         // 2. 填充审计字段与并发令牌
         ApplyAuditFields();
 
+        // 2.5 墙上钟守卫：库里不存时区，Kind != Unspecified 的 DateTime 先换算成墙上钟。
+        //     PostgreSQL 写 Kind=Utc 会直接抛异常（表现为 500），SqlServer/SQLite 则会静默存进去 ——
+        //     在这里统一换算，把三种库的行为拉齐。Unspecified 原样保留（它本身已是墙上钟）。
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified))
+                continue;
+
+            foreach (var property in entry.Properties)
+            {
+                var type = property.Metadata.ClrType;
+
+                if (type != typeof(DateTime) && type != typeof(DateTime?))
+                    continue;
+
+                if (property.CurrentValue is DateTime value && value.Kind != DateTimeKind.Unspecified)
+                    property.CurrentValue = CloudLTime.ToWallClock(value);
+            }
+        }
+
         int affectedRows;
         try
         {
