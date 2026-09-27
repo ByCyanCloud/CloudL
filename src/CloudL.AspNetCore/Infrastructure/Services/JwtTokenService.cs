@@ -41,7 +41,8 @@ public class JwtTokenService : IJwtTokenService
         string userCode,
         string userName,
         IEnumerable<string>? roles = null,
-        string? organizationCode = null)
+        string? organizationCode = null,
+        IEnumerable<Claim>? extraClaims = null)
     {
         var claims = new List<Claim>
         {
@@ -63,7 +64,12 @@ public class JwtTokenService : IJwtTokenService
         if (!string.IsNullOrWhiteSpace(organizationCode))
         {
             claims.Add(new Claim("organization_code", organizationCode));
+
         }
+
+        // 追加调用方提供的 claim（例如设备端需要的自定义声明）
+        if (extraClaims is not null)
+            claims.AddRange(extraClaims);
 
         var descriptor = new SecurityTokenDescriptor
         {
