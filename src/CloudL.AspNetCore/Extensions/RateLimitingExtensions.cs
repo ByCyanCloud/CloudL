@@ -152,7 +152,7 @@ public static class RateLimitingExtensions
             .CreateLogger("CloudL.AspNetCore.RateLimiting");
 
         logger.LogWarning(
-            "\n请求被限流\n[Request]\n{Method} {Path}\n[ClientIp]\n{ClientIp}",
+            "请求被限流\n[Request]\n{Method} {Path}\n[ClientIp]\n{ClientIp}\n",
             httpContext.Request.Method,
             httpContext.Request.Path,
             ResolveClientKey(httpContext));

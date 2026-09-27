@@ -74,7 +74,7 @@ public class ExceptionHandlingMiddleware
         {
             _logger.LogError(
                 exception,
-                "\n响应已开始，无法写出统一错误响应\n[ErrorId={ErrorId}] {Method} {Path}",
+                "响应已开始，无法写出统一错误响应\n[ErrorId={ErrorId}] {Method} {Path}\n",
                 errorId, context.Request.Method, context.Request.Path);
             return;
         }
@@ -105,7 +105,7 @@ public class ExceptionHandlingMiddleware
         {
             _logger.LogError(
                 exception,
-                "\n未处理的异常\n[Response]\nstatusCode={StatusCode}, errorId={ErrorId}, message={Message}\n[Request]\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n[Body]\n{Body}",
+                "未处理的异常\n[Response]\nstatusCode={StatusCode}, errorId={ErrorId}, message={Message}\n[Request]\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n[Body]\n{Body}\n",
                 response.StatusCode, response.ErrorId, response.Message,
                 context.Request.Method, context.Request.Path, context.Request.QueryString,
                 authHeader, requestBody);
@@ -113,7 +113,7 @@ public class ExceptionHandlingMiddleware
         }
 
         _logger.LogWarning(
-            "\n业务异常\n[Response]\nstatusCode={StatusCode}, errorId={ErrorId}, message={Message}\n[Request]\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n[Body]\n{Body}",
+            "业务异常\n[Response]\nstatusCode={StatusCode}, errorId={ErrorId}, message={Message}\n[Request]\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n[Body]\n{Body}\n",
             response.StatusCode, response.ErrorId, response.Message,
             context.Request.Method, context.Request.Path, context.Request.QueryString,
             authHeader, requestBody);

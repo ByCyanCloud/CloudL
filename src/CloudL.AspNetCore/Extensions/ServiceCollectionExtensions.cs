@@ -370,7 +370,7 @@ public static class ServiceCollectionExtensions
             httpContext.Request.Headers.Authorization.ToString());
 
         logger.LogWarning(
-            "\n认证/授权失败: {Message}\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}",
+            "认证/授权失败: {Message}\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n",
             message,
             httpContext.Request.Method,
             httpContext.Request.Path,
