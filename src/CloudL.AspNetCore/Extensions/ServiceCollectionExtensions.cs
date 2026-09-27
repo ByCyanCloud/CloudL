@@ -1,3 +1,4 @@
+using CloudL.AspNetCore.Startup;
 using CloudL.AspNetCore.HttpApi.Swagger;
 using CloudL.Domain.Shared.Time;
 using System.Net.Http.Headers;
@@ -89,6 +90,9 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         CloudLTime.Configure(configuration.GetSection(TimeOptions.SectionName).Get<TimeOptions>());
+
+        // 启动信息：等服务真正开始监听后输出运行环境与监听地址（零配置，业务项目无需改动）
+        services.AddHostedService<StartupInfoLogger>();
 
         // 请求/响应体与验证错误键仍为 snake_case；query 参数自 0.2.1 起为 camelCase
         // 同时保留 camelCase 写法，避免破坏既有调用方。
