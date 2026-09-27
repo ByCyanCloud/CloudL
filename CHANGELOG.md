@@ -4,6 +4,30 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.4.0] - 2026-09-27
+
+### 变更（破坏性：依赖大版本升级）
+
+- **Swashbuckle.AspNetCore 6.9 → 10.2**（连同 `Microsoft.OpenApi` 1.6 → 3.x）：
+  `Microsoft.OpenApi.Models` 并入根命名空间；`OpenApiSecurityScheme.Reference` / `OpenApiReference` 被移除
+  （改用 `OpenApiSecuritySchemeReference`）；`OpenApiSecurityRequirement` 的 scopes 由 `string[]` 改为 `List<string>`；
+  `AddSecurityRequirement` 改收 `Func<OpenApiDocument, …>`。框架内部已全部适配；
+  **业务项目若自己用过这些类型需要同步改**。
+- **Serilog.AspNetCore 8.0 → 10.0**（模板侧 Sinks 同步升到 Console 6.1.1 / File 7.0.0，否则生成的项目会 NU1605）。
+- **Mapster 7.4 → 10.0**、**Microsoft.NET.Test.Sdk 17.12 → 18.10**、**xunit.runner.visualstudio 2.8 → 4.0**、**coverlet 6.0 → 10.0**。
+- 补丁级同步升级：EF Core 与 Microsoft.Extensions 10.0.9 → 10.0.12、JwtBearer/TestHost 10.0.0 → 10.0.12、
+  Npgsql 10.0.2 → 10.0.3、xunit 2.9.2 → 2.9.3。
+- **日志排版修正**：块状日志的换行从"消息开头"改为由**输出模板最前面的 `{NewLine}`** 产生 —— 原先换行落在
+  `[级别]` 前缀之后，导致前缀独占一行（日志看起来"标题与正文分离"）。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。**
+- ⚠️ **破坏性变更：是**（依赖大版本）。业务项目升级后如出现 NU1605 包降级，说明项目侧钉了更低的版本
+  —— 请**不要钉框架已传递的包**（EF Core / Serilog / Swashbuckle 等）。
+- ⚠️ 日志模板：若项目自带 `appsettings.json` 的 `outputTemplate`，请改成以 `{NewLine}` 开头，才能得到
+  "每条日志前一个空行"的效果（模板项目已默认改好）。
+- 未升级项：`SQLitePCLRaw.lib.e_sqlite3` 固定 2.1.13（3.x 与 EF 带来的 `bundle_e_sqlite3 2.1.11` 不兼容）。
 ## [0.3.2] - 2026-09-25
 
 ### 新增
