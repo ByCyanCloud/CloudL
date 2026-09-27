@@ -4,6 +4,23 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.3.2] - 2026-09-25
+
+### 新增
+
+- **时间墙上钟保证**：新增 `TimeOptions.ToWallClock(DateTime)` / `(DateTime?)`（实例与静态 `CloudLTime` 各一份）。
+  `Unspecified` 原样返回（它本身就是墙上钟），只有 `Utc`/`Local` 才换算 —— 顺序不能反：
+  `new DateTimeOffset(Unspecified)` 会把它当作服务器本地时间，导致墙上钟再被套一层偏移。
+- **写入守卫**：`SaveChanges` 前扫描 `Added`/`Modified` 实体的 `DateTime`/`DateTime?` 属性，
+  `Kind != Unspecified` 一律换算成本口径的墙上钟。此前 `Kind=Utc` 在 PostgreSQL 上会直接抛异常
+  （表现为 500），在 SqlServer/SQLite 上却会静默存进去 —— 现在三种库行为一致。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。**
+- **破坏性变更：否**（均为新增；`extraClaims` 是可选参数，现有调用不受影响）。
+- 行为变化：写入的 `DateTime` 会被归一为墙上钟（原先在 PostgreSQL 上写 `Kind=Utc` 会 500、
+  在 SqlServer 上会带着 Utc Kind 落库，属缺陷修正）。
 ## [0.3.1] - 2026-09-25
 
 ### 修复
