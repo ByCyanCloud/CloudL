@@ -4,6 +4,27 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.5.0] - 2026-09-27
+
+### 变更（破坏性：仓储契约分层）
+
+- 把 **EF Core 专属**的两个成员从通用契约 `IRepository<TEntity, TKey>` **下移**到新增的
+  `IEfCoreRepository<TEntity, TKey>`（位于 `CloudL.EntityFrameworkCore`）：
+  `GetQueryable()` 与 `ToListAsync<TResult>(IQueryable<TResult>)`。
+- `IEfCoreRepository<,>` **继承** `IRepository<,>` —— 继承它的业务接口**能力只增不减**。
+- 分层原因：这两个成员依赖 **LINQ 提供程序**，除 EF Core 外的实现（如 SqlSugar 的 `ISugarQueryable`）
+  **无法实现 `IQueryable<T>`**，放在通用契约里会让"通用仓储"绑死 EF。
+- `AddCloudLEntityFrameworkCore` 现在**同时注册**两个契约（指向同一个 `EfCoreRepository<,>`）。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。**
+- ⚠️ **破坏性变更：是**（`IRepository` 少了两个成员）：
+  - 若你的仓储接口继承了 `IRepository` **且应用层调用过** `GetQueryable()` / `ToListAsync(IQueryable<>)`
+    → 升级后**编译报错**（不会静默失效）→ 把业务接口的基接口改为 `IEfCoreRepository<...>` 即可；
+    **应用层与仓储实现类都无需改动**（基类已实现新契约）。
+  - 若未用过这两个方法 → **零改动**。
+- 本次中断已登记在 `src/CloudL.Core/CompatibilitySuppressions.xml`（有意为之的 API 中断）。
 ## [0.4.1] - 2026-09-27
 
 ### 新增
