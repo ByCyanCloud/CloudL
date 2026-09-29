@@ -10,6 +10,7 @@
 
   <ItemGroup Label="对象映射">
     <PackageVersion Include="Mapster" Version="10.0.13" />
+    <PackageVersion Include="SqlSugarCore" Version="5.1.4.221" />
   </ItemGroup>
 
   <ItemGroup Label="EF Core 与数据库提供程序">

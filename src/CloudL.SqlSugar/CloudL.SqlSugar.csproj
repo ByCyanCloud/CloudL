@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <AssemblyName>CloudL.SqlSugar</AssemblyName>
+    <RootNamespace>CloudL</RootNamespace>
+    <PackageId>CloudL.SqlSugar</PackageId>
+    <Title>CloudL SqlSugar</Title>
+    <Description>CloudL DDD 框架的 SqlSugar 持久化层（与数据库无关）：仓储实现、工作单元与审计字段填充，可用 SqlSugar 支持的各类数据库（含达梦等国产数据库）。它与 CloudL.EntityFrameworkCore 是**并列的二选一**：同一个项目只允许启用一套 ORM（同时注册会在启动时直接失败），规则见 CONTRACT.md。</Description>
+    <PackageTags>ddd;sqlsugar;dameng;dm;framework;cloudl</PackageTags>
+    <!--
+      新包首次发布前没有历史版本可作基线（全局基线 0.3.0 里还没有 CloudL.SqlSugar），
+      因此先关闭包校验；0.6.0 发布之后应改为 PackageValidationBaselineVersion=0.6.0。
+    -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+  </PropertyGroup>
+
+  <!--
+    只依赖 SqlSugar 核心包：具体数据库由使用方的 DbType + 连接串决定，
+    因此这里不引用任何数据库驱动（达梦/MySQL/Oracle 等由使用方按需添加）。
+  -->
+  <ItemGroup>
+    <PackageReference Include="SqlSugarCore" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CloudL.Core\CloudL.Core.csproj" />
+  </ItemGroup>
+
+</Project>
