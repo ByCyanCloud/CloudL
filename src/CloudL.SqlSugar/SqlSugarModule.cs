@@ -64,6 +64,20 @@ public static class SqlSugarModule
 
                         // 忽略规则来自 CloudL.Core 的中立声明 NotPersistedAttribute，
                         // 不依赖任何具体 ORM 的配置，避免只有某个 ORM 才知道要忽略
+                        // 框架不存储时区：时间列必须是不带时区的类型（EF 侧由 ConfigureConventions 做同样的事）
+                        if (property.PropertyType == typeof(DateTime) || property.PropertyType == typeof(DateTime?))
+                        {
+                            column.DataType ??= dbType switch
+                            {
+                                DbType.PostgreSQL => "timestamp without time zone",
+                                DbType.SqlServer => "datetime2",
+                                DbType.Dm => "TIMESTAMP",
+                                DbType.Oracle => "TIMESTAMP",
+                                DbType.MySql => "datetime",
+                                _ => "TEXT"
+                            };
+                        }
+
                         if (property.IsDefined(typeof(NotPersistedAttribute), inherit: true))
                         {
                             column.IsIgnore = true;
