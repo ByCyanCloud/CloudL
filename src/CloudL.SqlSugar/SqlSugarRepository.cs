@@ -1,3 +1,4 @@
+using CloudL.Domain.Shared.Time;
 using System.Linq.Expressions;
 using CloudL.Domain.Entities;
 using CloudL.Domain.Repositories;
@@ -111,6 +112,12 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     public virtual async Task UpdateAsync(TEntity entity, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entity);
+
+        // 刷新审计时间：EF 侧由 FrameworkDbContext.ApplyAuditFields 统一处理，SqlSugar 没有那一步
+        // 刷新审计时间：EF 由 ApplyAuditFields 统一处理，SqlSugar 没有那一步。
+        // 用 IAuditable 接口是为了一次覆盖 AuditableEntity<TKey> 与非泛型 AuditableEntity 两个基类。
+        if (entity is IAuditable auditable)
+            auditable.UpdatedAt = CloudLTime.Now();
 
         await Client.Updateable(entity).ExecuteCommandAsync().ConfigureAwait(false);
     }
