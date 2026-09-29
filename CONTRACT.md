@@ -157,3 +157,28 @@
 > **落地要求（`CloudL.SqlSugar` 包必须满足）**：实现"**启动即失败**"守卫 —— 若同一应用同时注册了 EF 与 SqlSugar 两套持久化，
 > 启动直接抛异常并说明"请二选一"。目的是把"数据不一致的隐形 bug"变成"立刻可见的配置错误"。
 
+---
+
+## 仓储契约的分层（IRepository 与 IEfCoreRepository）
+
+| 契约 | 所在项目 | 内容 |
+|---|---|---|
+| **`IRepository<TEntity, TKey>`** | `CloudL.Core` | **ORM 中立**的通用仓储：`GetByIdAsync` / `FindAsync` / `FindSingleAsync` / `FindSingleForUpdateAsync` / `ExistsAsync` / `AddAsync` / `AddRangeAsync` / `UpdateAsync` / `DeleteAsync` / `DeleteByIdAsync` / `CountAsync` / `GetPagedAsync` |
+| **`IEfCoreRepository<TEntity, TKey>`** | `CloudL.EntityFrameworkCore` | 在通用契约之上**额外**提供 EF Core 专属的两个成员：`GetQueryable()`（`IQueryable<TEntity>`，无跟踪）与 `ToListAsync<TResult>(IQueryable<TResult>)` |
+
+**为什么分层**：这两个成员依赖 **LINQ 提供程序**，除 EF Core 之外的实现（如 SqlSugar 的 `ISugarQueryable`）**无法实现 `IQueryable<T>`** —— 放在通用契约里会让"通用仓储"绑死 EF。
+
+**继承关系**：`IEfCoreRepository<,>` **继承** `IRepository<,>`，因此业务接口继承它会**同时**获得两套能力：
+
+```csharp
+// 只需要中立能力（推荐：将来换 ORM 无痛）
+public interface IUserRepository : IRepository<User, Guid> { }
+
+// 需要 IQueryable 逃生口（EF 项目）
+public interface IUserRepository : IEfCoreRepository<User, Guid> { }
+```
+
+**升级提示（重要）**：`GetQueryable()` 与 `ToListAsync(IQueryable<>)` 已从 `IRepository` **移到** `IEfCoreRepository`。
+若你的仓储接口继承了 `IRepository` **且**应用层调用过这两个方法，升级后会**编译报错**（不会静默失效）——
+把业务接口的基接口换成 `IEfCoreRepository` 即可，**应用层代码无需改动**。
+

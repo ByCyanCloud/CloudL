@@ -45,6 +45,7 @@ public static class EntityFrameworkCoreModule
 
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
         services.AddScoped(typeof(IRepository<,>), typeof(EfCoreRepository<,>));
+        services.AddScoped(typeof(IEfCoreRepository<,>), typeof(EfCoreRepository<,>));
 
         return services;
     }

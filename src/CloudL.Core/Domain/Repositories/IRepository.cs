@@ -63,12 +63,4 @@ public interface IRepository<TEntity, TKey>
         Expression<Func<TEntity, object>>? orderBy = null,
         bool descending = true,
         CancellationToken cancellationToken = default);
-
-    /// <summary>获取可查询对象（无跟踪，用于投影查询）。</summary>
-    IQueryable<TEntity> GetQueryable();
-
-    /// <summary>执行投影查询。</summary>
-    Task<List<TResult>> ToListAsync<TResult>(
-        IQueryable<TResult> query,
-        CancellationToken cancellationToken = default);
 }

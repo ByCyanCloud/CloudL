@@ -11,7 +11,7 @@ namespace CloudL.EntityFrameworkCore.Repositories;
 /// </summary>
 /// <typeparam name="TEntity">实体类型。</typeparam>
 /// <typeparam name="TKey">主键类型。</typeparam>
-public class EfCoreRepository<TEntity, TKey> : IRepository<TEntity, TKey>
+public class EfCoreRepository<TEntity, TKey> : IEfCoreRepository<TEntity, TKey>
     where TEntity : Entity<TKey>
     where TKey : notnull
 {
