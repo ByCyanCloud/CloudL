@@ -107,6 +107,19 @@ $projects = @(
     'packaging/CloudL.Templates/CloudL.Templates.csproj'
 )
 
+# 自检：可打包项目一个都不能漏（2026-09-29：CloudL.SqlSugar 与 CloudL.EntityFrameworkCore.Dm 因为没列进上面数组，
+# 从未进入 local-feed，工作流却仍然是绿的 —— 静默漏发。这里把它变成启动即失败。）
+$packable = Get-ChildItem (Join-Path $PSScriptRoot '../src') -Recurse -Filter *.csproj -File |
+    Where-Object { (Get-Content $_.FullName -Raw) -match '<IsPackable>true</IsPackable>' } |
+    ForEach-Object { $_.FullName.Substring($repoRoot.Length + 1).Replace('\', '/') }
+$listed = $projects | ForEach-Object { $_.Replace('\', '/') }
+$missing = $packable | Where-Object { $listed -notcontains $_ }
+if ($missing) {
+    Write-Host '错误：以下项目可打包但未列入本脚本的 $projects 数组，会被静默漏发：' -ForegroundColor Red
+    $missing | ForEach-Object { Write-Host ('  - ' + $_) -ForegroundColor Red }
+    throw '请把它们加入 $projects 数组后再打包。'
+}
+
 Write-Host "==> 输出目录: $FeedPath" -ForegroundColor Cyan
 if ($Version) {
     Write-Host "==> 指定版本: $Version" -ForegroundColor Cyan
