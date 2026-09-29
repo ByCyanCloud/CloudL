@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <AssemblyName>CloudL.EntityFrameworkCore.Dm</AssemblyName>
+    <RootNamespace>CloudL</RootNamespace>
+    <PackageId>CloudL.EntityFrameworkCore.Dm</PackageId>
+    <Title>CloudL EntityFrameworkCore Dm</Title>
+    <Description>CloudL DDD 框架的达梦（DM）数据库提供程序：为 DbContextOptionsBuilder 提供 UseCloudLDm。⚠️ 依赖的是达梦官方 EF Core 9 版提供程序（DM.Microsoft.EntityFrameworkCore 9.0.0.x），而框架本体使用 EF Core 10；该组合尚未在真实达梦实例上验证，请先在测试库确认再上生产。官方发布 EF Core 10 版后应立即升级本包依赖。</Description>
+    <PackageTags>ddd;entity-framework-core;dm;dameng;framework;cloudl</PackageTags>
+
+    <!--
+      本包是新增的，0.3.0 基线里不存在 CloudL.EntityFrameworkCore.Dm，因此不能继承全局基线校验
+      （否则还原时会找 CloudL.EntityFrameworkCore.Dm 0.3.0 而报 NU1101）。
+      首次发布（0.6.0）之后应改为 PackageValidationBaselineVersion=0.6.0 并删除下面这一行。
+    -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      达梦官方 EF Core 提供程序。注意：官方目前最新为 9.0.0.x（面向 EF Core 9），
+      而框架使用 EF Core 10.0.12 —— 版本区间能够还原，但 provider 与 EF 强绑定，
+      属于未验证组合（详见包描述与 CONTRACT.md 的达梦章节）。
+    -->
+    <PackageReference Include="DM.Microsoft.EntityFrameworkCore" />
+    <!-- 直接引用以消除 NU1603：官方 EF 包声明的 8.3.1.33719 在 nuget.org 上不存在 -->
+    <PackageReference Include="DM.DmProvider" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CloudL.EntityFrameworkCore\CloudL.EntityFrameworkCore.csproj" />
+  </ItemGroup>
+
+</Project>

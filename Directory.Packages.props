@@ -17,6 +17,9 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+    <PackageVersion Include="DM.Microsoft.EntityFrameworkCore" Version="9.0.0.43760" />
+    <!-- 官方 EF 包要 8.3.1.33719，该版本不在 nuget.org；钉住实际可解析的补丁版以消除 NU1603 -->
+    <PackageVersion Include="DM.DmProvider" Version="8.3.1.36935" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
   <!-- Sqlite 带出的传递依赖 2.1.11 有已知高危漏洞（GHSA-2m69-gcr7-jv3q），显式钉到同主版本线的补丁版 -->

@@ -223,6 +223,13 @@ public abstract class FrameworkDbContext : DbContext
         {
             configurationBuilder.Properties<DateTime>().HaveColumnType("timestamp without time zone");
             configurationBuilder.Properties<DateTime?>().HaveColumnType("timestamp without time zone");
+
+            // 达梦：provider 默认的 TIMESTAMP 本身不带时区，这里显式写出来，避免依赖 provider 默认值
+            if (Database.ProviderName?.Contains("Dm", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                configurationBuilder.Properties<DateTime>().HaveColumnType("TIMESTAMP");
+                configurationBuilder.Properties<DateTime?>().HaveColumnType("TIMESTAMP");
+            }
         }
     }
 

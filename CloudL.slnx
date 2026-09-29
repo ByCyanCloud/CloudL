@@ -6,6 +6,7 @@
     <Project Path="src/CloudL.SqlSugar/CloudL.SqlSugar.csproj" />
     <Project Path="src/CloudL.EntityFrameworkCore.PostgreSql/CloudL.EntityFrameworkCore.PostgreSql.csproj" />
     <Project Path="src/CloudL.EntityFrameworkCore.SqlServer/CloudL.EntityFrameworkCore.SqlServer.csproj" />
+    <Project Path="src/CloudL.EntityFrameworkCore.Dm/CloudL.EntityFrameworkCore.Dm.csproj" />
   </Folder>
   <Folder Name="/packaging/">
     <Project Path="packaging/CloudL.Templates/CloudL.Templates.csproj" />
