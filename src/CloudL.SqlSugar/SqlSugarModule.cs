@@ -1,3 +1,4 @@
+using CloudL.Domain.Shared.Constants;
 using System.Reflection;
 using CloudL.Domain.DomainEvents;
 using CloudL.Domain.Entities;
@@ -64,6 +65,21 @@ public static class SqlSugarModule
 
                         // 忽略规则来自 CloudL.Core 的中立声明 NotPersistedAttribute，
                         // 不依赖任何具体 ORM 的配置，避免只有某个 ORM 才知道要忽略
+                        // 字符串列：未显式指定长度时，套用与 EF 侧（ApplyDefaultStringConventions）相同的默认长度，
+                        // 直接引用同一个常量，避免两边漂移
+                        if (property.PropertyType == typeof(string) && column.DataType is null)
+                        {
+                            column.DataType = dbType switch
+                            {
+                                DbType.PostgreSQL => $"character varying({AppConstants.DefaultStringMaxLength})",
+                                DbType.SqlServer => $"nvarchar({AppConstants.DefaultStringMaxLength})",
+                                DbType.Dm => $"VARCHAR({AppConstants.DefaultStringMaxLength})",
+                                DbType.Oracle => $"VARCHAR2({AppConstants.DefaultStringMaxLength})",
+                                DbType.MySql => $"varchar({AppConstants.DefaultStringMaxLength})",
+                                _ => "TEXT"
+                            };
+                        }
+
                         // 框架不存储时区：时间列必须是不带时区的类型（EF 侧由 ConfigureConventions 做同样的事）
                         if (property.PropertyType == typeof(DateTime) || property.PropertyType == typeof(DateTime?))
                         {
