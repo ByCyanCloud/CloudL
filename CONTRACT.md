@@ -213,5 +213,6 @@ services.AddCloudLSqlSugar(options =>
 - `[NotPersisted]`（`CloudL.Core`）标记的成员**任何 ORM 都不持久化** —— 忽略规则只写一份。
 - `Entity<TKey>.AssignId` **仅供持久化实现或测试**在键未生成时补齐，**业务代码不要调用**。
 - 一个项目**只允许一套 ORM**：同时注册 EF 与 SqlSugar 会在**启动时失败**。
+- ⚠️ **SqlSugar 版尚未支持领域事件分发与乐观锁并发令牌**（EF 版支持）：迁移到 SqlSugar 的项目若依赖这两项，请先确认，勿假定它们生效。
 - 迁移方式（方案 C）：开发期可用 `EnableInitTables`，生产用**版本化 SQL 脚本 + 迁移记录表**（执行器为后续版本）。
 
