@@ -4,6 +4,28 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.6.0] - 2026-09-27
+
+### 新增
+
+- **`CloudL.SqlSugar` 包**：SqlSugar 持久化实现（适用于**达梦等国产数据库**），与 `CloudL.EntityFrameworkCore` **并列二选一**；
+  提供 `AddCloudLSqlSugar(...)`、`SqlSugarRepository<,>`（与 `IRepository<,>` 同一份契约）、`SqlSugarUnitOfWork`。
+- **中立持久化标记** `PersistenceProvider`：同一应用同时注册 EF 与 SqlSugar 时**启动即失败**，避免两套审计/事务/迁移语义造成数据不一致。
+- **中立忽略声明** `NotPersistedAttribute`：忽略规则**只写一份**（已用于 `BaseEntity.DomainEvents` —— 此前 SqlSugar 会把它当列写并抛异常）。
+- **`Entity<TKey>.AssignId`**：主键补齐入口（**仅供持久化实现/测试**，业务不要调用）。
+
+### 变更
+
+- SqlSugar 侧时间列按 `DbType` 映射为**不带时区**类型（达梦 `TIMESTAMP`），与 EF 侧一致。
+- SqlSugar 侧字符串默认长度引用**同一个常量** `AppConstants.DefaultStringMaxLength`。
+- SqlSugar 的 `UpdateAsync` 通过 `IAuditable` 刷新 `UpdatedAt`。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。破坏性变更：否**（均为新增）。
+- SqlSugar 与 EF 有**三个固有差异**（无变更跟踪、主键不自动生成、回滚只能靠事务），详见 CONTRACT.md。
+- 框架维护者注意：`CloudL.SqlSugar` 首次发布前关闭了包校验基线，**0.6.0 发布后应改为 `PackageValidationBaselineVersion=0.6.0`**。
+
 ## [0.5.0] - 2026-09-27
 
 ### 变更（破坏性：仓储契约分层）

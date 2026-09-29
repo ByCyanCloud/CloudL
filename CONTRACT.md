@@ -182,3 +182,36 @@ public interface IUserRepository : IEfCoreRepository<User, Guid> { }
 若你的仓储接口继承了 `IRepository` **且**应用层调用过这两个方法，升级后会**编译报错**（不会静默失效）——
 把业务接口的基接口换成 `IEfCoreRepository` 即可，**应用层代码无需改动**。
 
+---
+
+## SqlSugar 持久化（CloudL.SqlSugar）
+
+```csharp
+services.AddCloudLSqlSugar(options =>
+{
+    options.ConnectionString = configuration.GetRequiredConnectionString();
+    options.DbType = "Dm";            // Dm(达梦) / PostgreSQL / SqlServer / MySql / Sqlite / Oracle
+    options.EnableInitTables = false; // 仅开发期可开；生产用版本化 SQL 脚本
+});
+```
+
+注册后可用 `IRepository<,>` / `IUnitOfWork`（与 EF 版**同一份契约**）以及 `ISqlSugarClient`。
+
+### 与 EF 版的固有差异（三个，务必先读）
+
+| # | 差异 | 影响 |
+|---|---|---|
+| 1 | **没有变更跟踪**：`AddAsync`/`UpdateAsync`/`DeleteAsync` **立即下发 SQL** | 不要依赖「不调用 `SaveChangesAsync` 就不会落库」；`SaveChangesAsync` 固定返回 0 |
+| 2 | **主键不会自动生成**（EF 由键生成器填） | 仓储插入前补齐：`Guid` 主键由框架补；其它类型**必须**在建实体时传入，否则抛明确错误 |
+| 3 | **回滚只能靠事务** | 需要同生共死的写操作必须放进 `ExecuteInTransactionAsync` |
+
+### 约定与对齐
+
+- 分页与 EF 一致：`pageIndex` **1 基**、总数在排序前统计、**两个方向都追加主键次级排序**（否则并列值翻页会重复或漏行）。
+- 列约定与 EF 同源：时间列**不带时区**（按 `DbType` 映射，达梦为 `TIMESTAMP`）；字符串未显式配置时用 `AppConstants.DefaultStringMaxLength`（**同一个常量**）。
+- `UpdateAsync` 通过 `IAuditable` 刷新 `UpdatedAt`（覆盖泛型与非泛型两种可审计基类）；`CreatedAt` 由实体基类构造时写入。
+- `[NotPersisted]`（`CloudL.Core`）标记的成员**任何 ORM 都不持久化** —— 忽略规则只写一份。
+- `Entity<TKey>.AssignId` **仅供持久化实现或测试**在键未生成时补齐，**业务代码不要调用**。
+- 一个项目**只允许一套 ORM**：同时注册 EF 与 SqlSugar 会在**启动时失败**。
+- 迁移方式（方案 C）：开发期可用 `EnableInitTables`，生产用**版本化 SQL 脚本 + 迁移记录表**（执行器为后续版本）。
+
