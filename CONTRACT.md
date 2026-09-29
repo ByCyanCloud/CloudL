@@ -216,3 +216,31 @@ services.AddCloudLSqlSugar(options =>
 - ⚠️ **SqlSugar 版尚未支持领域事件分发与乐观锁并发令牌**（EF 版支持）：迁移到 SqlSugar 的项目若依赖这两项，请先确认，勿假定它们生效。
 - 迁移方式（方案 C）：开发期可用 `EnableInitTables`，生产用**版本化 SQL 脚本 + 迁移记录表**（执行器为后续版本）。
 
+---
+
+## 达梦（DM）：EF Core 提供程序（CloudL.EntityFrameworkCore.Dm）
+
+```csharp
+services.AddCloudLEntityFrameworkCore<AppDbContext>(options =>
+    options.UseCloudLDm(configuration.GetRequiredConnectionString()));
+```
+
+- 时间列：达梦侧显式使用**不带时区**的 `TIMESTAMP`（与 Npgsql 分支同一意图，见数据库约定）。
+
+### ⚠️ 依赖版本错位（务必先读）
+
+- 达梦官方 EF Core 提供程序最新为 `DM.Microsoft.EntityFrameworkCore 9.0.0.x`（面向 **EF Core 9**），
+  而框架本体使用 **EF Core 10.0.12**。该组合**能还原、能编译**（已验证），但 provider 与 EF 强绑定，
+  **尚未在真实达梦实例上验证** —— 请先在测试库确认，再上生产。
+- 官方发布 EF Core 10 版后，**应立即升级本包依赖**（本包只用 `UseDm`，升级通常只需改版本号）。
+- `DM.DmProvider` 被**直接引用**并钉在 `8.3.1.36935`：官方 EF 包声明依赖 `8.3.1.33719`，而该版本不在 nuget.org 上（不直接引用会报 NU1603）。
+
+### 上线前的三步验证
+
+1. `dotnet ef migrations add Init`；
+2. 真连达梦执行迁移；
+3. 增删改查各一次 + 一次分页。
+
+若出现 `MissingMethodException` 之类的**运行期**错误，说明 EF9↔10 不兼容 → 等官方 EF Core 10 版，
+或改用**已经打通并验证**的 `CloudL.SqlSugar`（见上一节）。
+

@@ -13,6 +13,7 @@
 - **中立持久化标记** `PersistenceProvider`：同一应用同时注册 EF 与 SqlSugar 时**启动即失败**，避免两套审计/事务/迁移语义造成数据不一致。
 - **中立忽略声明** `NotPersistedAttribute`：忽略规则**只写一份**（已用于 `BaseEntity.DomainEvents` —— 此前 SqlSugar 会把它当列写并抛异常）。
 - **`Entity<TKey>.AssignId`**：主键补齐入口（**仅供持久化实现/测试**，业务不要调用）。
+- **`CloudL.EntityFrameworkCore.Dm` 包**：达梦（DM）EF Core 提供程序（`UseCloudLDm`）。⚠️ 依赖达梦官方 **EF Core 9** 版提供程序而框架用 EF Core 10，属**未经真实达梦实例验证**的组合；官方发布 EF10 版后应立即升级。`DM.DmProvider` 已直接引用并钉在 `8.3.1.36935`（官方声明的 `8.3.1.33719` 不在 nuget.org）。
 
 ### 变更
 
