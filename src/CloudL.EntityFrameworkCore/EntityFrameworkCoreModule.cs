@@ -1,3 +1,4 @@
+using CloudL.Domain.Shared.Persistence;
 using CloudL.Domain.Repositories;
 using CloudL.EntityFrameworkCore.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +37,13 @@ public static class EntityFrameworkCoreModule
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configureDatabase);
+
+        // 启动即失败：同一应用不允许同时启用两套持久化（详见 CONTRACT.md）
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(PersistenceProvider)))
+            throw new InvalidOperationException(
+                "本应用已启用另一套持久化实现（SqlSugar）。同一个项目只允许一套 ORM，请二选一。");
+
+        services.AddSingleton(new PersistenceProvider(PersistenceProviderKind.EntityFrameworkCore));
 
         services.AddDbContext<TContext>((_, options) => configureDatabase(options));
 
