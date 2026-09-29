@@ -10,7 +10,8 @@
     <PackageTags>ddd;sqlsugar;dameng;dm;framework;cloudl</PackageTags>
     <!--
       新包首次发布前没有历史版本可作基线（全局基线 0.3.0 里还没有 CloudL.SqlSugar），
-      因此先关闭包校验；0.6.1 发布之后应改为 PackageValidationBaselineVersion=0.6.1。
+      ⚠️ 待办：当本机/镜像能够解析 CloudL.<包名> 0.6.1 之后，把下面这行改为
+      <PackageValidationBaselineVersion>0.6.1</PackageValidationBaselineVersion>。
     -->
     <EnablePackageValidation>false</EnablePackageValidation>
   </PropertyGroup>
