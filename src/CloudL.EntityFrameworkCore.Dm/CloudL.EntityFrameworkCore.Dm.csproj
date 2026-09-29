@@ -12,7 +12,7 @@
     <!--
       本包是新增的，0.3.0 基线里不存在 CloudL.EntityFrameworkCore.Dm，因此不能继承全局基线校验
       （否则还原时会找 CloudL.EntityFrameworkCore.Dm 0.3.0 而报 NU1101）。
-      首次发布（0.6.0）之后应改为 PackageValidationBaselineVersion=0.6.0 并删除下面这一行。
+      首次发布（0.6.1）之后应改为 PackageValidationBaselineVersion=0.6.1 并删除下面这一行。
     -->
     <EnablePackageValidation>false</EnablePackageValidation>
   </PropertyGroup>

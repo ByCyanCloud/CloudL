@@ -4,6 +4,21 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.6.1] - 2026-09-29
+
+### 修复
+
+- **0.6.0 静默漏发了两个新包**：`build/pack.ps1` 用**显式项目数组**决定打包范围，
+  而 `CloudL.SqlSugar` 与 `CloudL.EntityFrameworkCore.Dm` 没有被列进去 —— 它们从未进入 `local-feed`，
+  工作流的 `local-feed/*.nupkg` 通配推送自然无从推它们；而发布后校验只轮询 `cloudl.core` 与 `cloudl.templates`，
+  **于是 run 是绿的、两个包却没发** ✗。
+- 已把两个项目补进 `pack.ps1`；本版本重新发布，使这两个包**首次上架**为 0.6.1（其余 6 个包由 `--skip-duplicate` 跳过）。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。破坏性变更：否。**
+- 框架维护者：`CloudL.SqlSugar` 与 `CloudL.EntityFrameworkCore.Dm` 的包校验基线应在本次上架后改为 `0.6.1`。
+
 ## [0.6.0] - 2026-09-27
 
 ### 新增
