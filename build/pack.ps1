@@ -102,6 +102,8 @@ $projects = @(
     'src/CloudL.EntityFrameworkCore.PostgreSql/CloudL.EntityFrameworkCore.PostgreSql.csproj',
     'src/CloudL.EntityFrameworkCore.SqlServer/CloudL.EntityFrameworkCore.SqlServer.csproj',
     'src/CloudL.AspNetCore/CloudL.AspNetCore.csproj',
+    'src/CloudL.EntityFrameworkCore.Dm/CloudL.EntityFrameworkCore.Dm.csproj',
+    'src/CloudL.SqlSugar/CloudL.SqlSugar.csproj',
     'packaging/CloudL.Templates/CloudL.Templates.csproj'
 )
 
