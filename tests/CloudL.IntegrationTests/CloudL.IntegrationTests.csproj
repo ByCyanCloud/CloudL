@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\CloudL.SqlSugar\CloudL.SqlSugar.csproj" />
     <ProjectReference Include="..\..\src\CloudL.AspNetCore\CloudL.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\CloudL.Core\CloudL.Core.csproj" />
     <ProjectReference Include="..\..\src\CloudL.EntityFrameworkCore\CloudL.EntityFrameworkCore.csproj" />

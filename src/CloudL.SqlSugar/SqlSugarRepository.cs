@@ -80,6 +80,8 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     {
         ArgumentNullException.ThrowIfNull(entity);
 
+        EnsureKey(entity);
+
         await Client.Insertable(entity).ExecuteCommandAsync().ConfigureAwait(false);
 
         return entity;
@@ -96,6 +98,11 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
 
         if (list.Count == 0)
             return;
+
+        foreach (var item in list)
+        {
+            EnsureKey(item);
+        }
 
         await Client.Insertable(list.ToList()).ExecuteCommandAsync().ConfigureAwait(false);
     }
@@ -168,5 +175,26 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
             PageIndex = pageIndex,
             PageSize = pageSize
         };
+    }
+
+
+    /// <summary>
+    /// 插入前补齐主键：SqlSugar 不会自动生成主键，键为默认值时所有行会互相覆盖。
+    /// Guid 主键由框架补齐；其它类型请在建实体时传入主键，否则给出明确错误。
+    /// </summary>
+    private static void EnsureKey(TEntity entity)
+    {
+        if (!EqualityComparer<TKey>.Default.Equals(entity.Id, default!))
+            return;
+
+        if (typeof(TKey) == typeof(Guid))
+        {
+            entity.AssignId((TKey)(object)Guid.NewGuid());
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"实体 {typeof(TEntity).Name} 的主键（{typeof(TKey).Name}）没有生成：SqlSugar 不会自动生成主键，" +
+            "请在构造实体时传入主键，或改用 Guid 主键（框架会补齐）。");
     }
 }

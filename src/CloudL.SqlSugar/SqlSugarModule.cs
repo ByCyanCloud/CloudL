@@ -1,3 +1,6 @@
+using System.Reflection;
+using CloudL.Domain.DomainEvents;
+using CloudL.Domain.Entities;
 using CloudL.Domain.Repositories;
 using System;
 using System.Linq;
@@ -47,8 +50,26 @@ public static class SqlSugarModule
             {
                 ConnectionString = options.ConnectionString,
                 DbType = dbType,
-                IsAutoCloseConnection = true
-            },
+                IsAutoCloseConnection = true,
+                ConfigureExternalServices = new ConfigureExternalServices
+                {
+                    // 框架基类里有不属于数据库的成员（如 BaseEntity.DomainEvents）。
+                    // EF 侧靠 BaseEntityConfiguration 的 Ignore 排除，SqlSugar 没有那份配置，
+                    // 因此必须在这里显式忽略 —— 否则会被当成列写入，运行时直接抛
+                    // "No mapping exists from object type ... IDomainEvent"。
+                    EntityService = (property, column) =>
+                    {
+                        if (column.IsIgnore)
+                            return;
+
+                        // 忽略规则来自 CloudL.Core 的中立声明 NotPersistedAttribute，
+                        // 不依赖任何具体 ORM 的配置，避免只有某个 ORM 才知道要忽略
+                        if (property.IsDefined(typeof(NotPersistedAttribute), inherit: true))
+                        {
+                            column.IsIgnore = true;
+                        }
+                    }
+                }            },
             client =>
             {
                 if (options.EnableSqlLog)

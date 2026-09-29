@@ -1,5 +1,6 @@
 namespace CloudL.Domain.Entities;
 
+using CloudL.Domain.Shared.Persistence;
 using CloudL.Domain.Shared.Time;
 using CloudL.Domain.DomainEvents;
 
@@ -12,6 +13,7 @@ public abstract class BaseEntity
     private readonly List<IDomainEvent> _domainEvents = [];
 
     /// <summary>当前实体上待分发的领域事件。</summary>
+    [NotPersisted]
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     /// <summary>登记一个领域事件，将在 SaveChanges 成功后分发。</summary>
@@ -54,6 +56,12 @@ public abstract class Entity<TKey> : Entity
 {
     /// <summary>实体唯一标识。</summary>
     public TKey Id { get; protected set; } = default!;
+
+    /// <summary>
+    /// 补齐主键 —— <strong>仅供持久化实现使用</strong>（EF 由数据库/键生成器负责，
+    /// SqlSugar 等没有键生成机制的实现需要显式补齐）。业务代码不要调用。
+    /// </summary>
+    public void AssignId(TKey id) => Id = id;
 
     protected Entity()
     {
