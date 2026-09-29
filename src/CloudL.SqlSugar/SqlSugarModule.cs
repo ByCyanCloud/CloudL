@@ -1,3 +1,4 @@
+using CloudL.Domain.Repositories;
 using System;
 using System.Linq;
 using CloudL.Domain.Shared.Persistence;
@@ -53,6 +54,10 @@ public static class SqlSugarModule
                 if (options.EnableSqlLog)
                     client.Aop.OnLogExecuting = (sql, _) => Console.WriteLine(sql);
             }));
+
+        // 通用仓储与工作单元（与 EF 版同一份契约）
+        services.AddScoped(typeof(IRepository<,>), typeof(SqlSugarRepository<,>));
+        services.AddScoped<IUnitOfWork, SqlSugarUnitOfWork>();
 
         return services;
     }
