@@ -14,12 +14,14 @@
 | `CloudL.EntityFrameworkCore` | 持久化核心（**与数据库无关**）：`FrameworkDbContext`（审计/乐观锁/领域事件）、`EfCoreRepository<,>`、`EfCoreUnitOfWork`（`ExecuteInTransactionAsync`）、实体配置基类、`AddCloudLEntityFrameworkCore<TContext>()`、`GetRequiredConnectionString()` |
 | `CloudL.EntityFrameworkCore.PostgreSql` | PostgreSQL 提供程序：`options.UseCloudLPostgreSql(connectionString)` |
 | `CloudL.EntityFrameworkCore.SqlServer` | SQL Server 提供程序：`options.UseCloudLSqlServer(connectionString)` |
+| `CloudL.SqlSugar` | **SqlSugar 持久化实现**（与 `CloudL.EntityFrameworkCore` **并列二选一**，适用达梦等国产库）：`AddCloudLSqlSugar(...)`、`SqlSugarRepository<,>`、`SqlSugarUnitOfWork`、`SqlSugarMigrationRunner`（版本化脚本迁移） |
+| `CloudL.EntityFrameworkCore.Dm` | 达梦（DM）提供程序：`options.UseCloudLDm(connectionString)`。⚠️ 依赖达梦官方 **EF Core 9** 版提供程序而框架用 EF Core 10，属**未经真实达梦实例验证**的组合 |
 | `CloudL.AspNetCore` | 统一响应、全局异常中间件、模型验证过滤器、**query 命名校验**、**IP 维度限流**、**账号锁定**、JWT/CORS/Swagger、当前用户上下文、PBKDF2 密码哈希、HTTP 客户端封装、**请求日志与脱敏**、`AddCloudLAspNetCore()` |
 | `CloudL.Templates` | `dotnet new` 模板（九层业务骨架），短名 `cloudl`；`dotnet new install CloudL.Templates` |
 
 ## 架构概览
 
-框架 = **5 个框架包 + 1 个模板包** + **9 层业务骨架**（由 `dotnet new cloudl` 生成）：
+框架 = **7 个框架包 + 1 个模板包** + **9 层业务骨架**（由 `dotnet new cloudl` 生成）：
 
 ```
 业务项目
@@ -36,7 +38,7 @@
           └─ 依赖框架包：CloudL.Core
                          CloudL.AspNetCore
                          CloudL.EntityFrameworkCore
-                         CloudL.EntityFrameworkCore.PostgreSql（或 .SqlServer）
+                         CloudL.EntityFrameworkCore.PostgreSql / .SqlServer / .Dm
                          CloudL.Templates（dotnet new 模板）
 ```
 
@@ -53,7 +55,7 @@ cd ./BookStore
 dotnet build
 ```
 
-生成的骨架保留九层结构，但只承载业务代码；框架代码全部来自上表三个包。
+生成的骨架保留九层结构，但只承载业务代码；框架代码全部来自上表各包。
 
 ## 目录结构
 
@@ -64,7 +66,7 @@ CloudL/
 ├── nuget.config                   # 包源 + 源映射（防依赖混淆）
 ├── CloudL.slnx                     # 框架解决方案
 ├── build/pack.ps1                 # 打包脚本：pack + 推本地源 + 装模板
-├── src/                           # 三个框架包
+├── src/                           # 七个框架包
 ├── tests/                         # 单元测试 + 模板冒烟测试
 ├── packaging/CloudL.Templates/    # dotnet new 模板包（内容为 template/，九层业务骨架）
 └── local-feed/                    # 本机 NuGet 源（打包输出）
@@ -189,7 +191,7 @@ await _unitOfWork.ExecuteInTransactionAsync(async ct =>
 
 ```xml
 <EnablePackageValidation>true</EnablePackageValidation>
-<PackageValidationBaselineVersion>0.1.0</PackageValidationBaselineVersion>
+<PackageValidationBaselineVersion>0.7.0</PackageValidationBaselineVersion>
 ```
 
 - 目的不是"禁止破坏"，而是**让每一次破坏都必须是有意识的**：手滑删掉一个 public 成员会直接让打包失败。
@@ -247,6 +249,6 @@ dotnet new cloudl -n MyCompany.BookStore -o ./BookStore
 3. **API 兼容性基线**：发布成功后把 `Directory.Build.props` 的 `PackageValidationBaselineVersion` 更新为新版本，
    并删掉两个 provider 包（`CloudL.EntityFrameworkCore.PostgreSql` / `.SqlServer`）里那两行空的基线覆盖；
    基线更新后，`CompatibilitySuppressions.xml` 中针对旧基线的条目即失效，可以清理。
-4. **框架与模板共同依赖的包要同步升级**：例如 `Serilog.AspNetCore` 两边都引用（当前都是 8.0.3），
+4. **框架与模板共同依赖的包要同步升级**：例如 `Serilog.AspNetCore` 两边都引用（当前都是 10.0.0），
    只升一边会让消费方撞上 NU1605 包降级错误。
-5. **发布后核对**：nuget.org 上 6 个包（含 `CloudL.Templates`）与符号包是否齐全、README 是否正常展示。
+5. **发布后核对**：nuget.org 上 8 个包（含 `CloudL.Templates`）与符号包是否齐全、README 是否正常展示。

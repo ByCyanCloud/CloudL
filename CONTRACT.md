@@ -203,7 +203,7 @@ services.AddCloudLSqlSugar(options =>
 | # | 差异 | 影响 |
 |---|---|---|
 | 1 | **没有变更跟踪**：`AddAsync`/`UpdateAsync`/`DeleteAsync` **立即下发 SQL** | 不要依赖「不调用 `SaveChangesAsync` 就不会落库」；`SaveChangesAsync` 固定返回 0 |
-| 2 | **主键不会自动生成**（EF 由键生成器填） | 仓储插入前补齐：`Guid` 主键由框架补；其它类型**必须**在建实体时传入，否则抛明确错误 |
+| 2 | **主键不会自动生成**（EF 侧配置为 `ValueGeneratedNever()`，键由实体构造函数生成，不是数据库生成） | 仓储插入前补齐：`Guid` 主键由框架补；其它类型**必须**在建实体时传入，否则抛明确错误 |
 | 3 | **回滚只能靠事务** | 需要同生共死的写操作必须放进 `ExecuteInTransactionAsync` |
 | 4 | **`FindSingleAsync` 用 `Single` 语义**（多条匹配抛异常，与 EF 一致）；`DeleteByIdAsync` **按主键直删、不收集领域事件** | 删除若依赖领域事件，请用 `DeleteAsync(entity)` |
 | 5 | **必填性不可移植**：SqlSugar 看不到 EF 的 `IsRequired()`，列按 CLR 类型判可空 | 需要 NOT NULL 的列请在 SqlSugar 侧显式配置 |
