@@ -1,7 +1,14 @@
-using CloudL.Domain.Shared.Time;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
+using CloudL.Domain.DomainEvents;
+using CloudL.Domain.Shared.Exceptions;
 using CloudL.Domain.Entities;
 using CloudL.Domain.Repositories;
+using CloudL.Domain.Shared.Time;
 using SqlSugar;
 
 namespace CloudL.SqlSugar;
@@ -13,9 +20,13 @@ namespace CloudL.SqlSugar;
 /// <para>与 <c>EfCoreRepository</c> <strong>语义对齐</strong>的点：分页 <c>pageIndex</c> 为 <strong>1 基</strong>；
 /// 统计总数在排序之前完成；默认按 <c>CreatedAt</c> 排序；<strong>两个方向都追加主键作为次级排序键</strong>
 /// （并列值之间的顺序在 SQL 中未定义，少了它会翻页重复或漏行）。</para>
-/// <para><strong>与 EF 的固有差异</strong>（会在文档里说明）：SqlSugar 没有变更跟踪，
-/// 因此"用于更新的跟踪查询"（<see cref="FindSingleForUpdateAsync"/>）在实现上与普通查询一致 ——
-/// 取出实体、修改后由调用方显式调用 <see cref="UpdateAsync"/>（工作单元在事务结束时提交）。</para>
+/// <para><strong>与 EF 的固有差异</strong>：SqlSugar 没有变更跟踪，因此
+/// <see cref="FindSingleForUpdateAsync"/> 与普通查询一致（取出实体、修改后显式 <see cref="UpdateAsync(TEntity, CancellationToken)"/>）。</para>
+/// <para><strong>领域事件</strong>：写操作<strong>成功后</strong>把实体上的事件交给 <see cref="SqlSugarUnitOfWork"/>；
+/// 不在事务内则立刻分发，在事务内则等提交后分发、回滚则丢弃。</para>
+/// <para><strong>乐观锁</strong>：<see cref="UpdateAsync(TEntity, Guid, CancellationToken)"/> 会按期望令牌做条件更新，
+/// 受影响行数为 0 时抛并发冲突（与 EF 的 <c>DbUpdateConcurrencyException</c> 语义对应）；
+/// 无参重载只推进令牌、不做冲突检测。</para>
 /// </remarks>
 public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     where TEntity : Entity<TKey>, new()
@@ -24,15 +35,19 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     /// <summary>SqlSugar 客户端。</summary>
     protected ISqlSugarClient Client { get; }
 
+    /// <summary>工作单元：用于收集领域事件（未注入时事件不会分发，且事务内也不会延迟）。</summary>
+    protected SqlSugarUnitOfWork? UnitOfWork { get; }
+
     /// <summary>构造仓储。</summary>
-    public SqlSugarRepository(ISqlSugarClient client)
+    public SqlSugarRepository(ISqlSugarClient client, SqlSugarUnitOfWork? unitOfWork = null)
     {
         ArgumentNullException.ThrowIfNull(client);
 
         Client = client;
+        UnitOfWork = unitOfWork;
     }
 
-    /// <summary>实体查询对象（无跟踪概念，SqlSugar 按需即时查询）。</summary>
+    /// <summary>实体查询对象。</summary>
     protected ISugarQueryable<TEntity> Queryable => Client.Queryable<TEntity>();
 
     /// <inheritdoc />
@@ -60,7 +75,7 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     }
 
     /// <inheritdoc />
-    /// <remarks>SqlSugar 无变更跟踪，语义与 <see cref="FindSingleAsync"/> 相同；修改后请显式调用 <see cref="UpdateAsync"/>。</remarks>
+    /// <remarks>SqlSugar 无变更跟踪，语义与 <see cref="FindSingleAsync"/> 相同；修改后请显式调用 <see cref="UpdateAsync(TEntity, CancellationToken)"/>。</remarks>
     public virtual Task<TEntity?> FindSingleForUpdateAsync(
         Expression<Func<TEntity, bool>> predicate,
         CancellationToken cancellationToken = default)
@@ -85,6 +100,8 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
 
         await Client.Insertable(entity).ExecuteCommandAsync().ConfigureAwait(false);
 
+        await CollectEventsAsync(entity, cancellationToken).ConfigureAwait(false);
+
         return entity;
     }
 
@@ -106,20 +123,53 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
         }
 
         await Client.Insertable(list.ToList()).ExecuteCommandAsync().ConfigureAwait(false);
+
+        foreach (var item in list)
+        {
+            await CollectEventsAsync(item, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
+    /// <remarks>推进乐观锁令牌但不做冲突检测；需要检测请用 <see cref="UpdateAsync(TEntity, Guid, CancellationToken)"/>。</remarks>
     public virtual async Task UpdateAsync(TEntity entity, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
-        // 刷新审计时间：EF 侧由 FrameworkDbContext.ApplyAuditFields 统一处理，SqlSugar 没有那一步
-        // 刷新审计时间：EF 由 ApplyAuditFields 统一处理，SqlSugar 没有那一步。
-        // 用 IAuditable 接口是为了一次覆盖 AuditableEntity<TKey> 与非泛型 AuditableEntity 两个基类。
-        if (entity is IAuditable auditable)
-            auditable.UpdatedAt = CloudLTime.Now();
+        RefreshAuditAndToken(entity);
 
         await Client.Updateable(entity).ExecuteCommandAsync().ConfigureAwait(false);
+
+        await CollectEventsAsync(entity, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 按<strong>期望的乐观锁令牌</strong>更新：只有库里当前令牌等于 <paramref name="expectedRowVersion"/> 时才更新。
+    /// </summary>
+    /// <remarks>
+    /// SqlSugar 没有变更跟踪，拿不到"原始令牌"，因此由调用方显式传入（通常来自查询到的实体）。
+    /// 受影响行数为 0 说明数据已被他人修改 —— 抛并发冲突并不再分发领域事件。
+    /// </remarks>
+    public virtual async Task UpdateAsync(
+        TEntity entity,
+        Guid expectedRowVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+
+        RefreshAuditAndToken(entity);
+
+        var affected = await Client.Updateable(entity)
+            .Where(it => it.RowVersion == expectedRowVersion)
+            .ExecuteCommandAsync()
+            .ConfigureAwait(false);
+
+        if (affected == 0)
+        {
+            throw new ConcurrencyConflictException("数据已被其他用户修改，请刷新后重试");
+        }
+
+        await CollectEventsAsync(entity, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -128,6 +178,8 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
         ArgumentNullException.ThrowIfNull(entity);
 
         await Client.Deleteable(entity).ExecuteCommandAsync().ConfigureAwait(false);
+
+        await CollectEventsAsync(entity, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -184,6 +236,32 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
         };
     }
 
+    /// <summary>刷新审计时间与乐观锁令牌（EF 侧由 ApplyAuditFields 统一处理）。</summary>
+    private static void RefreshAuditAndToken(TEntity entity)
+    {
+        if (entity is IAuditable auditable)
+        {
+            auditable.UpdatedAt = CloudLTime.Now();
+        }
+
+        entity.RowVersion = Guid.NewGuid();
+    }
+
+    /// <summary>把实体上待分发的领域事件交给工作单元（并清空实体上的事件，避免重复分发）。</summary>
+    private async Task CollectEventsAsync(TEntity entity, CancellationToken cancellationToken)
+    {
+        if (UnitOfWork is null)
+        {
+            entity.ClearDomainEvents();
+            return;
+        }
+
+        var events = entity.DomainEvents.ToArray();
+
+        entity.ClearDomainEvents();
+
+        await UnitOfWork.CollectAsync(events, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// 插入前补齐主键：SqlSugar 不会自动生成主键，键为默认值时所有行会互相覆盖。

@@ -80,6 +80,16 @@ public static class SqlSugarModule
                             };
                         }
 
+                        // 主键：框架把主键定义在 Entity<TKey>.Id 上（EF 侧由 BaseEntityConfiguration 声明），
+                        // SqlSugar 看不到那份配置 —— 不标出来，Updateable(entity)/Deleteable(entity) 会因为
+                        // 既没有主键也没有条件 而直接抛 SqlSugarException。
+                        if (property.Name == "Id"
+                            && property.DeclaringType is { IsGenericType: true } declaring
+                            && declaring.GetGenericTypeDefinition() == typeof(Entity<>))
+                        {
+                            column.IsPrimarykey = true;
+                        }
+
                         // 框架不存储时区：时间列必须是不带时区的类型（EF 侧由 ConfigureConventions 做同样的事）
                         if (property.PropertyType == typeof(DateTime) || property.PropertyType == typeof(DateTime?))
                         {
@@ -108,7 +118,8 @@ public static class SqlSugarModule
 
         // 通用仓储与工作单元（与 EF 版同一份契约）
         services.AddScoped(typeof(IRepository<,>), typeof(SqlSugarRepository<,>));
-        services.AddScoped<IUnitOfWork, SqlSugarUnitOfWork>();
+        services.AddScoped<SqlSugarUnitOfWork>();
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<SqlSugarUnitOfWork>());
 
         return services;
     }
