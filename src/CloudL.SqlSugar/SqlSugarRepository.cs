@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Collections.Concurrent;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -71,7 +73,7 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     {
         ArgumentNullException.ThrowIfNull(predicate);
 
-        return await Queryable.Where(predicate).FirstAsync().ConfigureAwait(false);
+        return await Queryable.Where(predicate).SingleAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -239,6 +241,7 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     /// <summary>刷新审计时间与乐观锁令牌（EF 侧由 ApplyAuditFields 统一处理）。</summary>
     private static void RefreshAuditAndToken(TEntity entity)
     {
+        NormalizeWallClock(entity);
         if (entity is IAuditable auditable)
         {
             auditable.UpdatedAt = CloudLTime.Now();
@@ -269,6 +272,7 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     /// </summary>
     private static void EnsureKey(TEntity entity)
     {
+        NormalizeWallClock(entity);   // 墙上钟守卫（与 EF 侧同一意图）
         if (!EqualityComparer<TKey>.Default.Equals(entity.Id, default!))
             return;
 
@@ -282,4 +286,28 @@ public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
             $"实体 {typeof(TEntity).Name} 的主键（{typeof(TKey).Name}）没有生成：SqlSugar 不会自动生成主键，" +
             "请在构造实体时传入主键，或改用 Guid 主键（框架会补齐）。");
     }
+
+    /// <summary>
+    /// 墙上钟守卫：库里不存时区，<c>Kind != Unspecified</c> 的 <c>DateTime</c> 先换算成墙上钟。
+    /// 与 EF 侧 <c>FrameworkDbContext</c> 的守卫同一意图 —— 否则写 PostgreSQL 会直接抛异常（表现为 500），
+    /// 写 SqlServer/Sqlite 则会静默存入口径错误的时间。属性清单按类型缓存，避免每次写入都反射扫描。
+    /// </summary>
+    private static void NormalizeWallClock(TEntity entity)
+    {
+        var properties = WallClockProperties.GetOrAdd(typeof(TEntity), static type =>
+            type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(property => (property.PropertyType == typeof(DateTime) || property.PropertyType == typeof(DateTime?))
+                                   && property is { CanRead: true, CanWrite: true })
+                .ToArray());
+
+        foreach (var property in properties)
+        {
+            if (property.GetValue(entity) is DateTime value && value.Kind != DateTimeKind.Unspecified)
+            {
+                property.SetValue(entity, CloudLTime.ToWallClock(value));
+            }
+        }
+    }
+
+    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> WallClockProperties = new();
 }
