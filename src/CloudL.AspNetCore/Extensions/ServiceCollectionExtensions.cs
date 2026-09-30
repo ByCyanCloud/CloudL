@@ -94,14 +94,6 @@ public static class ServiceCollectionExtensions
         // 启动信息：等服务真正开始监听后输出运行环境与监听地址（零配置，业务项目无需改动）
         services.AddHostedService<StartupInfoLogger>();
 
-        // 请求/响应体与验证错误键仍为 snake_case；query 参数自 0.2.1 起为 camelCase
-        // 同时保留 camelCase 写法，避免破坏既有调用方。
-        // query 参数：只支持 camelCase/PascalCase（MVC 原生大小写不敏感绑定）；snake_case 支持已移除
-        services.Configure<MvcOptions>(options =>
-        {
-            // query 参数已改为只支持 camelCase/PascalCase：snake_case 值提供器停用（类型保留以便将来恢复）
-            // query 参数改为只支持 camelCase/PascalCase，命名校验过滤器已停用（保留类型以便将来恢复）
-        });
 
         return services;
     }

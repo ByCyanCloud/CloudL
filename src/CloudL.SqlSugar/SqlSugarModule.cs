@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using CloudL.Domain.Shared.Constants;
 using System.Reflection;
 using CloudL.Domain.DomainEvents;
@@ -46,7 +47,7 @@ public static class SqlSugarModule
         services.AddSingleton(new PersistenceProvider(PersistenceProviderKind.SqlSugar));
 
         // SqlSugarScope 是线程安全实现，适合注册为单例；连接由 SqlSugar 自行管理
-        services.AddSingleton<ISqlSugarClient>(_ => new SqlSugarScope(
+        services.AddSingleton<ISqlSugarClient>(serviceProvider => new SqlSugarScope(
             new ConnectionConfig
             {
                 ConnectionString = options.ConnectionString,
@@ -120,7 +121,13 @@ public static class SqlSugarModule
             client =>
             {
                 if (options.EnableSqlLog)
-                    client.Aop.OnLogExecuting = (sql, _) => Console.WriteLine(sql);
+                    if (options.EnableSqlLog)
+                    {
+                        var logger = serviceProvider.GetService<ILoggerFactory>()?.CreateLogger("CloudL.SqlSugar");
+
+                        client.Aop.OnLogExecuting = (sql, _) =>
+                            logger?.LogDebug("SqlSugar 执行 SQL：{Sql}", sql);
+                    }
             }));
 
         // 通用仓储与工作单元（与 EF 版同一份契约）

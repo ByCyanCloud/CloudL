@@ -4,6 +4,33 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.7.1] - 2026-09-30
+
+### 修复
+
+- **SqlSugar 列约定此前完全不生效**：SqlSugar 会把 `DataType` 预填成自己的默认值（`DateTime` → `TIMESTAMP`），
+  因此"未配置才套默认值"的判断永不命中 —— **时间列不带时区**与**字符串默认长度**两条约定一条都没生效。
+  现改为按 `[SugarColumn(ColumnDataType=…)]` 判断是否显式配置。
+- **显式设置 `DataType` 会丢掉可空性**，把可空列建成 `NOT NULL`（已按 CLR 类型补回）。
+- **墙上钟守卫补齐到 SqlSugar**：此前只有 EF 侧有，SqlSugar 写 `Kind=Utc` 到 PostgreSQL 会抛异常。
+- **审计人字段补齐到 SqlSugar**：`created_by`/`updated_by` 此前恒为 NULL 且无任何报错。
+- **`FindSingleAsync` 统一 `Single` 语义**（此前用 `FirstAsync`，多条匹配时静默取首条，与 EF 不一致）。
+- **EF 侧 `RowVersion` 推进范围**：此前只对 `IAuditable` 推进，普通实体的并发令牌永不前进。
+- **`EnableInitTables` 从死选项变为真正接线**（需配合 `InitTablesEntityTypes`；留空则启动即失败）。
+- SqlSugar 事务深度只在 `finally` 递减一次（此前提交抛异常会被双重递减，导致写操作**静默脱离事务**）。
+- `EnableSqlLog` 改走 `ILogger`（不再用同步 `Console.WriteLine` 绕过 Serilog）。
+
+### 新增
+
+- `ISqlSugarRepository<,>`：把**带期望令牌的乐观锁更新**暴露到接口上（此前只在具体类上，注入 `IRepository` 的调用方调不到）。
+- 达梦真库测试（列约定/CRUD/事务回滚）：设 `CLOUDL_DM_CONNECTION` 后运行，未配置时**显式 Skipped**。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。破坏性变更：否。**
+- ⚠️ **SqlSugar 用户请核对表结构**：0.7.0 的列约定实际未生效 —— 若你已用 `InitTables` 或迁移建过表，
+  时间列类型可能与预期不同（例如字符串不是 256 长度、时间列类型不符）。建议按新版本**重新生成或核对** schema。
+
 ## [0.7.0] - 2026-09-29
 
 ### 新增
