@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 
 namespace CloudL.SqlSugar;
@@ -24,6 +25,12 @@ public sealed class SqlSugarOptions
     /// 生产环境请用版本化 SQL 脚本 + 迁移记录表（方案 C，见 CONTRACT.md）。
     /// </remarks>
     public bool EnableInitTables { get; set; }
+
+    /// <summary>
+    /// 需要自动建表的实体类型（仅在 <see cref="EnableInitTables"/> 为 true 时使用）。
+    /// <strong>开启却留空会启动即失败</strong> —— 那样什么表都不会建，属于静默失效。
+    /// </summary>
+    public IList<Type> InitTablesEntityTypes { get; } = new List<Type>();
 
     /// <summary>是否输出 SqlSugar 的 SQL 日志（通常仅开发期开启）。</summary>
     public bool EnableSqlLog { get; set; }

@@ -129,6 +129,20 @@ public static class SqlSugarModule
         services.AddScoped<SqlSugarUnitOfWork>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<SqlSugarUnitOfWork>());
 
+        // 把配置暴露给宿主服务（InitTables 需要它）
+        services.AddSingleton(options);
+
+        if (options.EnableInitTables)
+        {
+            // 开启却不给实体清单 = 什么都不会发生（此前正是这种静默失效），所以启动即失败
+            if (options.InitTablesEntityTypes.Count == 0)
+                throw new InvalidOperationException(
+                    "SqlSugarOptions.EnableInitTables 已开启，但 InitTablesEntityTypes 为空 —— " +
+                    "那样不会建任何表（静默失效）。请列出需要建表的实体类型，或关闭该选项。");
+
+            services.AddHostedService<SqlSugarInitTablesHostedService>();
+        }
+
         return services;
     }
 
