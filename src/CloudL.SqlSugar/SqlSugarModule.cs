@@ -59,37 +59,50 @@ public static class SqlSugarModule
                     // 因此必须在这里显式忽略 —— 否则会被当成列写入，运行时直接抛
                     // "No mapping exists from object type ... IDomainEvent"。
                     EntityService = (property, column) =>
-                    {
-                        // 显式设置 DataType 会丢掉可空信息，导致可空列被建成 NOT NULL
-                        // （2026-09-30 由审计测试发现：DateTime? 的 UpdatedAt 建成了 NOT NULL）。
-                        // 按 CLR 类型补回来，与 EF 默认一致：引用类型可空、Nullable<T> 可空。
+{
+                        // 注意：SqlSugar 会把 DataType 预填成它自己的默认值（DateTime -> TIMESTAMP），
+                        // 所以不能以 DataType is null 判断用户是否显式配置过 —— 那样下面两条规则永远不会生效
+                        // （2026-09-30 由按 DbType 的列约定测试发现：五种库的 DataType 全是 TIMESTAMP）。
+                        // 改为：属性上显式标了 ColumnDataType 才跳过。
+                        var explicitType = property.GetCustomAttribute<SugarColumn>()?.ColumnDataType;
+
+                        if (string.IsNullOrWhiteSpace(explicitType))
+                        {
+                            if (property.PropertyType == typeof(string))
+                            {
+                                column.DataType = dbType switch
+                                {
+                                    global::SqlSugar.DbType.PostgreSQL => $"character varying({AppConstants.DefaultStringMaxLength})",
+                                    global::SqlSugar.DbType.SqlServer => $"nvarchar({AppConstants.DefaultStringMaxLength})",
+                                    global::SqlSugar.DbType.Dm => $"VARCHAR({AppConstants.DefaultStringMaxLength})",
+                                    global::SqlSugar.DbType.Oracle => $"VARCHAR2({AppConstants.DefaultStringMaxLength})",
+                                    global::SqlSugar.DbType.MySql => $"varchar({AppConstants.DefaultStringMaxLength})",
+                                    _ => "TEXT"
+                                };
+                            }
+                            else if (property.PropertyType == typeof(DateTime) || property.PropertyType == typeof(DateTime?))
+                            {
+                                // 框架不存储时区：时间列必须是不带时区的类型（与 EF 侧 ConfigureConventions 同一意图）
+                                column.DataType = dbType switch
+                                {
+                                    global::SqlSugar.DbType.PostgreSQL => "timestamp without time zone",
+                                    global::SqlSugar.DbType.SqlServer => "datetime2",
+                                    global::SqlSugar.DbType.Dm => "TIMESTAMP",
+                                    global::SqlSugar.DbType.Oracle => "TIMESTAMP",
+                                    global::SqlSugar.DbType.MySql => "datetime",
+                                    _ => "TEXT"
+                                };
+                            }
+                        }
+
+                        // 可空性：显式设置 DataType 会丢掉它（曾把可空列建成 NOT NULL）；按 CLR 类型补回，与 EF 默认一致
                         if (property.PropertyType.IsClass || Nullable.GetUnderlyingType(property.PropertyType) is not null)
                         {
                             column.IsNullable = true;
                         }
-                        if (column.IsIgnore)
-                            return;
-
-                        // 忽略规则来自 CloudL.Core 的中立声明 NotPersistedAttribute，
-                        // 不依赖任何具体 ORM 的配置，避免只有某个 ORM 才知道要忽略
-                        // 字符串列：未显式指定长度时，套用与 EF 侧（ApplyDefaultStringConventions）相同的默认长度，
-                        // 直接引用同一个常量，避免两边漂移
-                        if (property.PropertyType == typeof(string) && column.DataType is null)
-                        {
-                            column.DataType = dbType switch
-                            {
-                                DbType.PostgreSQL => $"character varying({AppConstants.DefaultStringMaxLength})",
-                                DbType.SqlServer => $"nvarchar({AppConstants.DefaultStringMaxLength})",
-                                DbType.Dm => $"VARCHAR({AppConstants.DefaultStringMaxLength})",
-                                DbType.Oracle => $"VARCHAR2({AppConstants.DefaultStringMaxLength})",
-                                DbType.MySql => $"varchar({AppConstants.DefaultStringMaxLength})",
-                                _ => "TEXT"
-                            };
-                        }
 
                         // 主键：框架把主键定义在 Entity<TKey>.Id 上（EF 侧由 BaseEntityConfiguration 声明），
-                        // SqlSugar 看不到那份配置 —— 不标出来，Updateable(entity)/Deleteable(entity) 会因为
-                        // 既没有主键也没有条件 而直接抛 SqlSugarException。
+                        // SqlSugar 看不到那份配置 —— 不标出来，Updateable(entity)/Deleteable(entity) 会直接抛异常
                         if (property.Name == "Id"
                             && property.DeclaringType is { IsGenericType: true } declaring
                             && declaring.GetGenericTypeDefinition() == typeof(Entity<>))
@@ -97,20 +110,7 @@ public static class SqlSugarModule
                             column.IsPrimarykey = true;
                         }
 
-                        // 框架不存储时区：时间列必须是不带时区的类型（EF 侧由 ConfigureConventions 做同样的事）
-                        if (property.PropertyType == typeof(DateTime) || property.PropertyType == typeof(DateTime?))
-                        {
-                            column.DataType ??= dbType switch
-                            {
-                                DbType.PostgreSQL => "timestamp without time zone",
-                                DbType.SqlServer => "datetime2",
-                                DbType.Dm => "TIMESTAMP",
-                                DbType.Oracle => "TIMESTAMP",
-                                DbType.MySql => "datetime",
-                                _ => "TEXT"
-                            };
-                        }
-
+                        // 忽略规则来自 CloudL.Core 的中立声明（NotPersistedAttribute），不依赖任何具体 ORM 的配置
                         if (property.IsDefined(typeof(NotPersistedAttribute), inherit: true))
                         {
                             column.IsIgnore = true;
