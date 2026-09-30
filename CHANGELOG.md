@@ -13,6 +13,16 @@
   工作流的 `local-feed/*.nupkg` 通配推送自然无从推它们；而发布后校验只轮询 `cloudl.core` 与 `cloudl.templates`，
   **于是 run 是绿的、两个包却没发** ✗。
 - 已把两个项目补进 `pack.ps1`；本版本重新发布，使这两个包**首次上架**为 0.6.1（其余 6 个包由 `--skip-duplicate` 跳过）。
+- **`FrameworkDbContext.ConfigureConventions` 的达梦分支嵌在 Npgsql 判断内部 —— 静默失效** ✗：
+  "时间列用 `TIMESTAMP`"的达梦约定被写在了 `ProviderName.Contains("Npgsql")` 的 `if` **内部**，
+  而达梦的 provider 名是 `DM.Microsoft.EntityFrameworkCore`（不含 `Npgsql`）——
+  外层条件恒为 false，这段分支**一次也不会执行**，并且**不报错、不告警**：
+  时间列类型悄悄退化成 provider 默认值，只有**非 Npgsql 的提供程序（达梦等）**才会暴露；
+  Npgsql 侧一直正常，所以这个 bug 能潜伏很久。已改为两个**并列**分支（`if` / `else if`），
+  **Npgsql 与达梦两者都保留**，并在注释里写明原委；同时补了回归测试
+  `ProviderTimeColumnConventionTests`（达梦侧断言 `TIMESTAMP`、Npgsql 侧断言 `timestamp without time zone`，
+  两条缺一不可）钉住它。达梦 provider 的默认类型本来就是 `TIMESTAMP`，故**既有库与既有迁移无需改动**
+  （这也正是它此前没有暴露的原因）。
 
 ### 迁移影响
 

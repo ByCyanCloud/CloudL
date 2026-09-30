@@ -24,6 +24,10 @@
     <ProjectReference Include="..\..\src\CloudL.AspNetCore\CloudL.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\CloudL.Core\CloudL.Core.csproj" />
     <ProjectReference Include="..\..\src\CloudL.EntityFrameworkCore\CloudL.EntityFrameworkCore.csproj" />
+    <!-- 时间列约定的回归测试要按真实 ProviderName 分支，PostgreSQL 侧直接用框架的 Npgsql 提供程序包。
+         达梦侧不能引用：DM 官方 EF Core 9 版提供程序在 EF Core 10 上调用即抛 MissingMethodException，
+         那个分支改用"假提供程序名"触发（见 ProviderTimeColumnConventionTests 的注释）。 -->
+    <ProjectReference Include="..\..\src\CloudL.EntityFrameworkCore.PostgreSql\CloudL.EntityFrameworkCore.PostgreSql.csproj" />
   </ItemGroup>
 
 </Project>

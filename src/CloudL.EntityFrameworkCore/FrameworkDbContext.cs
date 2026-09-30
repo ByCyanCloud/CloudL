@@ -212,6 +212,11 @@ public abstract class FrameworkDbContext : DbContext
     /// <summary>
     /// 时间列一律映射为不带时区的类型（本框架不存储时区）。
     /// </summary>
+    /// <remarks>
+    /// 各提供程序<strong>并列判断、互不嵌套</strong>：<c>Database.ProviderName</c> 只会命中其中一个分支。
+    /// 用 <c>else if</c> 而不是嵌套 <c>if</c>，是为了让"新增一个提供程序"永远只是往链条末尾追加一段，
+    /// 不会像下面这个 bug 那样被误塞进别人的分支里而静默失效。
+    /// </remarks>
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         ArgumentNullException.ThrowIfNull(configurationBuilder);
@@ -223,13 +228,18 @@ public abstract class FrameworkDbContext : DbContext
         {
             configurationBuilder.Properties<DateTime>().HaveColumnType("timestamp without time zone");
             configurationBuilder.Properties<DateTime?>().HaveColumnType("timestamp without time zone");
-
-            // 达梦：provider 默认的 TIMESTAMP 本身不带时区，这里显式写出来，避免依赖 provider 默认值
-            if (Database.ProviderName?.Contains("Dm", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                configurationBuilder.Properties<DateTime>().HaveColumnType("TIMESTAMP");
-                configurationBuilder.Properties<DateTime?>().HaveColumnType("TIMESTAMP");
-            }
+        }
+        // 达梦：provider 默认的 TIMESTAMP 本身不带时区，这里显式写出来，避免依赖 provider 默认值
+        //
+        // ⚠️ 修复（原实现有 bug，且是静默失效）：这一支原本嵌在上面 Npgsql 的 if <strong>内部</strong>。
+        //    达梦的 ProviderName 是 "DM.Microsoft.EntityFrameworkCore"，不含 "Npgsql"，
+        //    所以外层条件恒为假 —— 达梦这段约定<strong>一次也不会执行</strong>，既不报错也不告警；
+        //    表现是时间列类型悄悄退化成 provider 默认值，只有在达梦上实测列类型时才会发现。
+        //    凡是非 Npgsql 的提供程序（达梦等）都会踩到这一点，故改为与 Npgsql 并列的分支，两者都保留。
+        else if (Database.ProviderName?.Contains("Dm", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            configurationBuilder.Properties<DateTime>().HaveColumnType("TIMESTAMP");
+            configurationBuilder.Properties<DateTime?>().HaveColumnType("TIMESTAMP");
         }
     }
 
