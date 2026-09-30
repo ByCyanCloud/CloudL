@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CloudL.Domain.DomainEvents;
 using CloudL.Domain.Shared.Exceptions;
+using CloudL.Application.Contracts.IServices;
 using CloudL.Domain.Entities;
 using CloudL.Domain.Repositories;
 using CloudL.Domain.Shared.Time;
@@ -40,13 +41,25 @@ public class SqlSugarRepository<TEntity, TKey> : ISqlSugarRepository<TEntity, TK
     /// <summary>工作单元：用于收集领域事件（未注入时事件不会分发，且事务内也不会延迟）。</summary>
     protected SqlSugarUnitOfWork? UnitOfWork { get; }
 
-    /// <summary>构造仓储。</summary>
+    /// <summary>当前用户：用于填充审计人字段（与 EF 侧 ApplyAuditFields 同源）。</summary>
+    protected ICurrentUser? CurrentUser { get; }
+    /// <summary>构造仓储（可选工作单元；DI 会自动选择可解析参数最多的构造函数）。</summary>
     public SqlSugarRepository(ISqlSugarClient client, SqlSugarUnitOfWork? unitOfWork = null)
+        : this(client, unitOfWork, null)
+    {
+    }
+
+    /// <summary>构造仓储：含当前用户，用于填充审计人字段（与 EF 侧 ApplyAuditFields 同源）。</summary>
+    public SqlSugarRepository(
+        ISqlSugarClient client,
+        SqlSugarUnitOfWork? unitOfWork,
+        ICurrentUser? currentUser)
     {
         ArgumentNullException.ThrowIfNull(client);
 
         Client = client;
         UnitOfWork = unitOfWork;
+        CurrentUser = currentUser;
     }
 
     /// <summary>实体查询对象。</summary>
@@ -98,7 +111,7 @@ public class SqlSugarRepository<TEntity, TKey> : ISqlSugarRepository<TEntity, TK
     {
         ArgumentNullException.ThrowIfNull(entity);
 
-        EnsureKey(entity);
+        PrepareForInsert(entity);
 
         await Client.Insertable(entity).ExecuteCommandAsync().ConfigureAwait(false);
 
@@ -121,7 +134,7 @@ public class SqlSugarRepository<TEntity, TKey> : ISqlSugarRepository<TEntity, TK
 
         foreach (var item in list)
         {
-            EnsureKey(item);
+            PrepareForInsert(item);
         }
 
         await Client.Insertable(list.ToList()).ExecuteCommandAsync().ConfigureAwait(false);
@@ -239,12 +252,15 @@ public class SqlSugarRepository<TEntity, TKey> : ISqlSugarRepository<TEntity, TK
     }
 
     /// <summary>刷新审计时间与乐观锁令牌（EF 侧由 ApplyAuditFields 统一处理）。</summary>
-    private static void RefreshAuditAndToken(TEntity entity)
+    private void RefreshAuditAndToken(TEntity entity)
     {
         NormalizeWallClock(entity);
         if (entity is IAuditable auditable)
         {
             auditable.UpdatedAt = CloudLTime.Now();
+
+        if (CurrentUser?.UserId is { } userId)
+            auditable.UpdatedBy = userId;
         }
 
         entity.RowVersion = Guid.NewGuid();
@@ -310,4 +326,13 @@ public class SqlSugarRepository<TEntity, TKey> : ISqlSugarRepository<TEntity, TK
     }
 
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> WallClockProperties = new();
+
+    /// <summary>插入前准备：补齐主键，并按 EF 侧语义填充审计人字段。</summary>
+    private void PrepareForInsert(TEntity entity)
+    {
+        EnsureKey(entity);
+
+        if (entity is IAuditable auditable && CurrentUser?.UserId is { } userId)
+            auditable.CreatedBy = userId;
+    }
 }

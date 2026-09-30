@@ -184,29 +184,38 @@ public abstract class FrameworkDbContext : DbContext
         return affectedRows;
     }
 
-    private void ApplyAuditFields()
-    {
-        var userId = _currentUser?.UserId;
-        var now = CloudLTime.Now();
-
-        foreach (var entry in ChangeTracker.Entries<IAuditable>())
+        private void ApplyAuditFields()
         {
-            switch (entry.State)
-            {
-                case EntityState.Added:
-                    if (userId.HasValue)
-                        entry.Entity.CreatedBy = userId;
-                    break;
+            var userId = _currentUser?.UserId;
+            var now = CloudLTime.Now();
 
-                case EntityState.Modified:
-                    entry.Entity.RowVersion = Guid.NewGuid();
-                    entry.Entity.UpdatedAt = now;
-                    if (userId.HasValue)
-                        entry.Entity.UpdatedBy = userId;
-                    break;
+            // 遍历所有 Entity（而不是只遍历 IAuditable）：RowVersion 定义在 Entity 上、
+            // 且被配置为并发令牌，若只对 IAuditable 推进，普通实体的令牌永不前进、
+            // IsConcurrencyToken 形同虚设（2026-09-30 修正）。
+            foreach (var entry in ChangeTracker.Entries<Entity>())
+            {
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                        if (entry.Entity is IAuditable added && userId.HasValue)
+                            added.CreatedBy = userId;
+                        break;
+
+                    case EntityState.Modified:
+                        entry.Entity.RowVersion = Guid.NewGuid();
+
+                        if (entry.Entity is IAuditable modified)
+                        {
+                            modified.UpdatedAt = now;
+
+                            if (userId.HasValue)
+                                modified.UpdatedBy = userId;
+                        }
+
+                        break;
+                }
             }
         }
-    }
 
 
     /// <summary>

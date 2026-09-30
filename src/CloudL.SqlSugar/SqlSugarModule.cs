@@ -60,6 +60,13 @@ public static class SqlSugarModule
                     // "No mapping exists from object type ... IDomainEvent"。
                     EntityService = (property, column) =>
                     {
+                        // 显式设置 DataType 会丢掉可空信息，导致可空列被建成 NOT NULL
+                        // （2026-09-30 由审计测试发现：DateTime? 的 UpdatedAt 建成了 NOT NULL）。
+                        // 按 CLR 类型补回来，与 EF 默认一致：引用类型可空、Nullable<T> 可空。
+                        if (property.PropertyType.IsClass || Nullable.GetUnderlyingType(property.PropertyType) is not null)
+                        {
+                            column.IsNullable = true;
+                        }
                         if (column.IsIgnore)
                             return;
 
