@@ -112,11 +112,12 @@ public class SqlSugarUnitOfWork : IUnitOfWork
 
         _transactionDepth++;
 
+        // 深度只在 finally 里递减一次：提交本身也可能抛（连接断开/死锁/超时），
+        // 若在成功路径与 catch 里各减一次，深度会变负、outermost 永远为 false，
+        // 于是 BeginTran 再也不执行 —— 写操作会静默脱离事务（2026-09-29 修复）。
         try
         {
             var result = await body().ConfigureAwait(false);
-
-            _transactionDepth--;
 
             if (!outermost)
                 return result;
@@ -133,17 +134,27 @@ public class SqlSugarUnitOfWork : IUnitOfWork
         }
         catch
         {
-            _transactionDepth--;
-
             if (outermost)
             {
-                // 回滚：丢弃攒下的事件，避免幽灵事件
+                // 回滚：丢弃攒下的事件，避免幽灵事件。
+                // 回滚自身失败不能掩盖原始异常，因此吞掉回滚异常。
                 _pendingDomainEvents.Clear();
 
-                await _client.Ado.RollbackTranAsync().ConfigureAwait(false);
+                try
+                {
+                    await _client.Ado.RollbackTranAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    // 忽略回滚异常：原始异常更重要
+                }
             }
 
             throw;
+        }
+        finally
+        {
+            _transactionDepth--;
         }
     }
 
