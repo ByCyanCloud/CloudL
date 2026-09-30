@@ -8,6 +8,9 @@
 
 ### 新增
 
+- **`Sha256SaltedHash`（`CloudL.Core/Domain.Shared/Security`）**：把"单次 SHA-256 + 随机盐"这一算法纳入框架
+  （格式 `sha256$<Base64盐>$<Base64哈希>`，**盐在前**）。供存量哈希兼容与机构密钥等场景使用；
+  用户口令仍应使用框架默认的 **PBKDF2**，并在校验通过后按 `NeedsRehash` 升级。
 - **SqlSugar 领域事件**：写操作成功后由仓储喂入工作单元；事务内**延迟**、**提交后分发**、**回滚丢弃**
   （不会出现"通知发出去了、数据却没落库"的幽灵事件）；实体上的事件立即清空，避免重复分发。
 - **SqlSugar 乐观锁**：`UpdateAsync(entity, expectedRowVersion)` 按期望令牌做条件更新，影响 0 行即抛

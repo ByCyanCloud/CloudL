@@ -246,3 +246,19 @@ services.AddCloudLEntityFrameworkCore<AppDbContext>(options =>
 若出现 `MissingMethodException` 之类的**运行期**错误，说明 EF9↔10 不兼容 → 等官方 EF Core 10 版，
 或改用**已经打通并验证**的 `CloudL.SqlSugar`（见上一节）。
 
+---
+
+## 安全：口令与密钥哈希
+
+| 场景 | 用什么 | 说明 |
+|---|---|---|
+| **用户登录口令** | 框架默认 **PBKDF2**（`IPasswordHasher` 默认实现） | 有工作因子、定长比较、迭代次数上限；**新口令一律用它** |
+| **存量哈希兼容** | `CloudL.Domain.Shared.Security.Sha256SaltedHash` | 单次 SHA-256 + 16 字节随机盐，格式 `sha256$<Base64盐>$<Base64哈希>`；**不带工作因子** |
+| **机构密钥等** | 同上（可用） | 适用于"库泄露后可接受离线穷举"的场景 |
+
+**存量迁移姿势**：口令校验通过后，用 `IPasswordHasher.NeedsRehash` 判断并**以 PBKDF2 重写** ——
+即"存量兼容 + 登录时自动升级"。
+
+⚠️ **拼接顺序与格式不可更改**：`Sha256SaltedHash` 是"**盐在前、明文在后**"（`SHA256(盐 ‖ UTF8(明文))`）。
+改顺序或改格式会让**所有存量哈希失效** —— 单元测试里有钉子用例固定这一点（用测试中独立构造的格式串校验）。
+
