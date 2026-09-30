@@ -118,6 +118,7 @@ public static class SqlSugarModule
 
         // 通用仓储与工作单元（与 EF 版同一份契约）
         services.AddScoped(typeof(IRepository<,>), typeof(SqlSugarRepository<,>));
+        services.AddScoped(typeof(ISqlSugarRepository<,>), typeof(SqlSugarRepository<,>));
         services.AddScoped<SqlSugarUnitOfWork>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<SqlSugarUnitOfWork>());
 

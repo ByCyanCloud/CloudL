@@ -30,7 +30,7 @@ namespace CloudL.SqlSugar;
 /// 受影响行数为 0 时抛并发冲突（与 EF 的 <c>DbUpdateConcurrencyException</c> 语义对应）；
 /// 无参重载只推进令牌、不做冲突检测。</para>
 /// </remarks>
-public class SqlSugarRepository<TEntity, TKey> : IRepository<TEntity, TKey>
+public class SqlSugarRepository<TEntity, TKey> : ISqlSugarRepository<TEntity, TKey>
     where TEntity : Entity<TKey>, new()
     where TKey : notnull
 {
