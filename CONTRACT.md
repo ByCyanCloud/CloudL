@@ -150,7 +150,8 @@
 | 2 | **严禁在同一请求 / 同一事务里混用两套 ORM** | 两者各有独立连接与事务 → 一边提交、一边回滚 → **数据不一致** |
 | 3 | **迁移只能由一方管理** | 两边都跑迁移会互相改坏对方的表 |
 
-**ORM 的选择发生在创建项目时**（模板参数 `--orm efcore|sqlsugar`），而不是运行时。
+**ORM 的选择发生在创建项目时**（一个项目只装一套 ✓），而不是运行时。
+> 注：模板目前**还没有** `--orm` 参数（`template.json` 只声明了 `frameworkVersion`）—— 生成 SqlSugar 骨架需手工装配，或等该参数实现。
 
 **过渡期若必须分模块/分表并用**，需同时满足：不同表集、不同事务边界、**只有一套负责建表改表**。
 
@@ -197,13 +198,18 @@ services.AddCloudLSqlSugar(options =>
 
 注册后可用 `IRepository<,>` / `IUnitOfWork`（与 EF 版**同一份契约**）以及 `ISqlSugarClient`。
 
-### 与 EF 版的固有差异（三个，务必先读）
+### 与 EF 版的固有差异（务必先读）
 
 | # | 差异 | 影响 |
 |---|---|---|
 | 1 | **没有变更跟踪**：`AddAsync`/`UpdateAsync`/`DeleteAsync` **立即下发 SQL** | 不要依赖「不调用 `SaveChangesAsync` 就不会落库」；`SaveChangesAsync` 固定返回 0 |
 | 2 | **主键不会自动生成**（EF 由键生成器填） | 仓储插入前补齐：`Guid` 主键由框架补；其它类型**必须**在建实体时传入，否则抛明确错误 |
 | 3 | **回滚只能靠事务** | 需要同生共死的写操作必须放进 `ExecuteInTransactionAsync` |
+| 4 | **`FindSingleAsync` 用 `Single` 语义**（多条匹配抛异常，与 EF 一致）；`DeleteByIdAsync` **按主键直删、不收集领域事件** | 删除若依赖领域事件，请用 `DeleteAsync(entity)` |
+| 5 | **必填性不可移植**：SqlSugar 看不到 EF 的 `IsRequired()`，列按 CLR 类型判可空 | 需要 NOT NULL 的列请在 SqlSugar 侧显式配置 |
+| 6 | **软删除 / 全局查询过滤器无等价物**：`HasQueryFilter` 是 EF 专属 | 换 ORM 时过滤条件会**静默失效**（被删数据可能重新查出），需另找做法 |
+| 7 | **命名空间撞名**：本包命名空间是 `CloudL.SqlSugar`，与库的 `SqlSugar` 同名 | 同文件里引用库类型请写 `global::SqlSugar.XXX` |
+| 8 | **默认 `DbType` 是 `Dm`（达梦）** | 连别的库务必显式设置 `DbType`，否则会去连达梦 |
 
 ### 约定与对齐
 
@@ -216,7 +222,7 @@ services.AddCloudLSqlSugar(options =>
 - ✅ **领域事件已支持**：仓储在写操作成功后把实体事件交给工作单元 → 事务内延迟、**提交后分发**、**回滚丢弃**（不会出现幽灵事件）；实体上的事件立即清空，避免重复分发。
 - ⚠️ **乐观锁需显式传期望令牌**：`UpdateAsync(entity, expectedRowVersion)`；因 SqlSugar 无变更跟踪、拿不到原始令牌，无参重载只推进令牌、**不做冲突检测**。
 - 📌 **规律**：EF 靠配置声明的元数据（忽略成员如 `DomainEvents`、主键 `Id`），SqlSugar 侧都在 `SqlSugarModule` 的 `EntityService` 里**显式声明过一次** —— 框架基类新增非持久化成员时，**两边都要处理**。
-- 迁移方式（方案 C）：开发期可用 `EnableInitTables`，生产用**版本化 SQL 脚本 + 迁移记录表**（执行器为后续版本）。
+- 迁移方式（方案 C）：开发期可用 `EnableInitTables`（需同时设置 `InitTablesEntityTypes`，留空会**启动即失败**）；生产用**版本化 SQL 脚本 + 迁移记录表**，执行器是 `SqlSugarMigrationRunner`（**已实现但未注册进 DI**，请自行 `new SqlSugarMigrationRunner(client)` 并调用 `MigrateAsync(脚本目录)`）。
 
 ---
 

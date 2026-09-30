@@ -12,21 +12,19 @@ namespace CloudL.SqlSugar;
 /// <summary>
 /// 基于 SqlSugar 的工作单元实现，含<strong>领域事件</strong>的收集、延迟与提交后分发。
 /// </summary>
-/// <remarks>
-/// <para><strong>与 EF 版的固有差异（很重要）</strong>：SqlSugar 的仓储方法是<strong>立即执行</strong>的
-/// （<c>Insertable/Updateable/Deleteable.ExecuteCommandAsync</c> 直接下发 SQL），<strong>没有变更跟踪</strong>，
-/// 因此不存在 EF 那种"先攒着、等 SaveChanges 一起提交"的模型：</para>
-/// <list type="bullet">
-///   <item>EF：<c>AddAsync</c> 只入跟踪器，不写库；不调用 <c>SaveChangesAsync</c> 就不会落库。</item>
-///   <item>SqlSugar：<c>AddAsync</c> <strong>已经落库</strong>；<see cref="SaveChangesAsync"/> 无待办事项，返回 0。</item>
-/// </list>
-/// <para>所以本实现下<strong>回滚只能靠事务</strong> —— 请把一组需要同生共死的写操作放进事务里。</para>
-/// <para><strong>领域事件语义与 EF 对齐</strong>：事件在写操作<strong>成功之后</strong>才分发；处于事务内时先攒起来，
-/// <strong>提交后</strong>才分发；事务回滚则<strong>丢弃</strong>（不会出现"通知发出去了、数据却没落库"的幽灵事件）。</para>
-/// <para><strong>乐观锁（RowVersion）尚未实现冲突检测</strong>：EF 依赖变更跟踪提供的"原始令牌"，
-/// 而 SqlSugar 没有原值，因此本实现只在更新时<strong>推进</strong> RowVersion，不会检测陈旧写入。
-/// 需要真冲突检测时应新增"显式传入期望令牌"的 API（列为后续版本待办）。</para>
-/// </remarks>
+    /// <remarks>
+    /// <para><strong>与 EF 版的固有差异（很重要）</strong>：SqlSugar 的仓储方法是<strong>立即执行</strong>的，
+    /// <strong>没有变更跟踪</strong>，因此不存在"先攒着、等 SaveChanges 一起提交"的模型：
+    /// EF 的 <c>AddAsync</c> 只入跟踪器、不写库，而这里的 <c>AddAsync</c> <strong>已经落库</strong>；
+    /// <see cref="SaveChangesAsync"/> 没有待办事项，固定返回 0。</para>
+    /// <para>所以本实现下<strong>回滚只能靠事务</strong>（<see cref="ExecuteInTransactionAsync(Func{CancellationToken, Task}, CancellationToken)"/>）——
+    /// 请把一组需要同生共死的写操作放进事务里，而不要依赖"不调用 SaveChanges 就不会写"。</para>
+    /// <para><strong>领域事件</strong>：写操作<strong>成功之后</strong>才收集；处于事务内时先攒起来、
+    /// <strong>提交后</strong>才分发；回滚则<strong>丢弃</strong>（不会出现"通知发出去了、数据却没落库"的幽灵事件）。</para>
+    /// <para><strong>乐观锁</strong>：支持带期望令牌的冲突检测 —— 用
+    /// <c>SqlSugarRepository.UpdateAsync(entity, expectedRowVersion)</c>（不带令牌的重载只推进令牌、不做检测）。
+    /// SqlSugar 没有变更跟踪、拿不到"原始令牌"，因此期望令牌需由调用方显式传入。</para>
+    /// </remarks>
 public class SqlSugarUnitOfWork : IUnitOfWork
 {
     private readonly ISqlSugarClient _client;
