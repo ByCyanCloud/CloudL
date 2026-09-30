@@ -15,7 +15,7 @@
       ⚠️ 待办：当本机/镜像能够解析 CloudL.<包名> 0.6.1 之后，把下面这行改为
       <PackageValidationBaselineVersion>0.6.1</PackageValidationBaselineVersion>。
     -->
-    <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.7.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>
