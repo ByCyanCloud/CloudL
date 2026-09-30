@@ -4,6 +4,28 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 契约分级与各节的权威描述见 [CONTRACT.md](https://github.com/ByCyanCloud/CloudL/blob/main/CONTRACT.md)。
 
+## [0.7.0] - 2026-09-29
+
+### 新增
+
+- **SqlSugar 领域事件**：写操作成功后由仓储喂入工作单元；事务内**延迟**、**提交后分发**、**回滚丢弃**
+  （不会出现"通知发出去了、数据却没落库"的幽灵事件）；实体上的事件立即清空，避免重复分发。
+- **SqlSugar 乐观锁**：`UpdateAsync(entity, expectedRowVersion)` 按期望令牌做条件更新，影响 0 行即抛
+  `ConcurrencyConflictException` 并**不分发领域事件**（与 EF 的 `DbUpdateConcurrencyException` 语义对应）。
+
+### 修复
+
+- SqlSugar 侧**声明主键**：`EntityService` 现在把 `Entity<TKey>.Id` 标为 `IsPrimarykey` —— 此前 EF 的
+  `BaseEntityConfiguration` 声明对 SqlSugar 不可见，`Updateable(entity)` 会抛
+  "You cannot have no primary key and no conditions"。
+- **DI 注册**：`SqlSugarUnitOfWork` 同时以具体类型与 `IUnitOfWork` 注册（否则仓储拿不到它，
+  **领域事件永远不会被收集**，且完全静默）。
+
+### 迁移影响
+
+- **需要业务侧新增 EF 迁移：否。破坏性变更：否**（均为新增）。
+- SqlSugar 的乐观锁**必须显式传期望令牌**（无变更跟踪，拿不到原值）。
+
 ## [0.6.1] - 2026-09-29
 
 ### 修复

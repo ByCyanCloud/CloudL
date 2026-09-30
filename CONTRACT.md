@@ -213,7 +213,9 @@ services.AddCloudLSqlSugar(options =>
 - `[NotPersisted]`（`CloudL.Core`）标记的成员**任何 ORM 都不持久化** —— 忽略规则只写一份。
 - `Entity<TKey>.AssignId` **仅供持久化实现或测试**在键未生成时补齐，**业务代码不要调用**。
 - 一个项目**只允许一套 ORM**：同时注册 EF 与 SqlSugar 会在**启动时失败**。
-- ⚠️ **SqlSugar 版尚未支持领域事件分发与乐观锁并发令牌**（EF 版支持）：迁移到 SqlSugar 的项目若依赖这两项，请先确认，勿假定它们生效。
+- ✅ **领域事件已支持**：仓储在写操作成功后把实体事件交给工作单元 → 事务内延迟、**提交后分发**、**回滚丢弃**（不会出现幽灵事件）；实体上的事件立即清空，避免重复分发。
+- ⚠️ **乐观锁需显式传期望令牌**：`UpdateAsync(entity, expectedRowVersion)`；因 SqlSugar 无变更跟踪、拿不到原始令牌，无参重载只推进令牌、**不做冲突检测**。
+- 📌 **规律**：EF 靠配置声明的元数据（忽略成员如 `DomainEvents`、主键 `Id`），SqlSugar 侧都在 `SqlSugarModule` 的 `EntityService` 里**显式声明过一次** —— 框架基类新增非持久化成员时，**两边都要处理**。
 - 迁移方式（方案 C）：开发期可用 `EnableInitTables`，生产用**版本化 SQL 脚本 + 迁移记录表**（执行器为后续版本）。
 
 ---
