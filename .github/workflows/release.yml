@@ -123,23 +123,49 @@ jobs:
       - name: 校验已发布（轮询包索引，未出现即失败）
         shell: pwsh
         run: |
+          # 从 local-feed 里本次打包出的每个 .nupkg 推导「包 id + 版本」，逐个等待其在索引中出现。
+          # 不再写死包名：2026-09-29 就发生过「新增包被漏打包→漏推送，而校验只盯两个老包，于是 run 是绿的」。
           $tag = "${{ inputs.tag || github.ref_name }}".TrimStart('v')
-          $urls = @(
-            'https://api.nuget.org/v3-flatcontainer/cloudl.core/index.json',
-            'https://api.nuget.org/v3-flatcontainer/cloudl.templates/index.json'
-          )
-          foreach ($url in $urls) {
+          $files = @(Get-ChildItem 'local-feed/*.nupkg' -ErrorAction SilentlyContinue)
+          if ($files.Count -eq 0) {
+            Write-Host "::error::local-feed 中没有 .nupkg，无法校验发布结果"
+            exit 1
+          }
+          $failed = 0
+          $matched = 0
+          foreach ($file in $files) {
+            if ($file.BaseName -notmatch '^(?<id>.+?)\.(?<ver>\d+\.\d+\.\d+.*)$') {
+              Write-Host "::error::无法从文件名解析包 id 与版本：$($file.Name)"
+              $failed = 1
+              continue
+            }
+            $id = $Matches['id'].ToLowerInvariant()
+            $version = $Matches['ver']
+            if ($version -ne $tag) {
+                # local-feed 里可能有历史版本（本地开发时）；只有本次标签版本的包才需要校验。
+                Write-Host "跳过 $id $version（不是本次标签 $tag 的产物）"
+                continue
+            }
+            $matched++
+            $url = "https://api.nuget.org/v3-flatcontainer/$id/index.json"
             $found = $false
             for ($i = 1; $i -le 30; $i++) {
               try {
                 $index = Invoke-RestMethod -Uri $url -TimeoutSec 30
-                if ($index.versions -contains $tag) { $found = $true; break }
+                if ($index.versions -contains $version) { $found = $true; break }
               } catch { }
               Start-Sleep -Seconds 20
             }
             if (-not $found) {
-              Write-Host "::error::$url 在 10 分钟内仍未出现版本 $tag —— 说明 push 步骤实际没有推送成功"
-              exit 1
+              Write-Host "::error::$id $version 在 10 分钟内仍未出现在 $url —— push 步骤实际没有推成功"
+              $failed = 1
+            } else {
+              Write-Host "$id $version 已上架 ✅"
             }
-            Write-Host "$url 已包含 $tag ✅"
           }
+          if ($matched -eq 0) {
+            Write-Host "::error::local-feed 中没有任何包的版本等于标签 $tag —— 打包版本号不对"
+            exit 1
+          }
+          Write-Host "本次已校验 $matched 个包（版本 $tag）"
+          exit $failed
