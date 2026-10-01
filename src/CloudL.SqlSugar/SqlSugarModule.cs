@@ -53,6 +53,10 @@ public static class SqlSugarModule
                 ConnectionString = options.ConnectionString,
                 DbType = dbType,
                 IsAutoCloseConnection = true,
+                // 标识符大小写：SqlSugar 默认把标识符转成大写下发。达梦实例 CASE_SENSITIVE=1 且库表
+                // 是小写（organizations / created_at）时，转大写会让 ORM 报「无效的表或视图名」——
+                // 表在库里、原生 SQL 读得到，只有 ORM 读不了。由业务侧显式设置 IsAutoToUpper=false。
+                MoreSettings = new ConnMoreSettings { IsAutoToUpper = options.IsAutoToUpper },
                 ConfigureExternalServices = new ConfigureExternalServices
                 {
                     // 框架基类里有不属于数据库的成员（如 BaseEntity.DomainEvents）。
@@ -65,21 +69,31 @@ public static class SqlSugarModule
                         // 所以不能以 DataType is null 判断用户是否显式配置过 —— 那样下面两条规则永远不会生效
                         // （2026-09-30 由按 DbType 的列约定测试发现：五种库的 DataType 全是 TIMESTAMP）。
                         // 改为：属性上显式标了 ColumnDataType 才跳过。
-                        var explicitType = property.GetCustomAttribute<SugarColumn>()?.ColumnDataType;
+                        var sugarColumn = property.GetCustomAttribute<SugarColumn>();
+                        var explicitType = sugarColumn?.ColumnDataType;
 
                         if (string.IsNullOrWhiteSpace(explicitType))
                         {
+                            // 只有**我们自己**写过完整类型串时才需要把 Length 归零（见下面那段注释）：
+                            // 别的 CLR 类型保持 SqlSugar 的原样处理，不去动它。
+                            var overrodeDataType = false;
+
                             if (property.PropertyType == typeof(string))
                             {
                                 column.DataType = dbType switch
                                 {
                                     global::SqlSugar.DbType.PostgreSQL => $"character varying({AppConstants.DefaultStringMaxLength})",
                                     global::SqlSugar.DbType.SqlServer => $"nvarchar({AppConstants.DefaultStringMaxLength})",
-                                    global::SqlSugar.DbType.Dm => $"VARCHAR({AppConstants.DefaultStringMaxLength})",
+                                    // 达梦的 VARCHAR(n) 按**字节**计（UTF-8 下一个汉字 3 字节）：256 只装得下
+                                    // 85 个汉字；NVARCHAR2(n) 按**字符**计（实测 50 个汉字正好、51 个报超长），
+                                    // 与 EF 侧 IsUnicode(true) 的意图一致。项目现有列就是 NVARCHAR2(n)。
+                                    global::SqlSugar.DbType.Dm => $"NVARCHAR2({AppConstants.DefaultStringMaxLength})",
                                     global::SqlSugar.DbType.Oracle => $"VARCHAR2({AppConstants.DefaultStringMaxLength})",
                                     global::SqlSugar.DbType.MySql => $"varchar({AppConstants.DefaultStringMaxLength})",
                                     _ => "TEXT"
                                 };
+
+                                overrodeDataType = true;
                             }
                             else if (property.PropertyType == typeof(DateTime) || property.PropertyType == typeof(DateTime?))
                             {
@@ -93,13 +107,42 @@ public static class SqlSugarModule
                                     global::SqlSugar.DbType.MySql => "datetime",
                                     _ => "TEXT"
                                 };
+
+                                overrodeDataType = true;
+                            }
+
+                            if (overrodeDataType)
+                            {
+                                // 上面赋的是**完整类型串**（自带括号）。SqlSugar 建表时会把 column.Length
+                                // 再拼一次 → 得到 "NVARCHAR2(256)(200)" 这种语法垃圾，达梦直接报
+                                // 「第 N 行附近出现错误: 语法分析出错」：迁移执行器连自己的历史表都建不出来
+                                // （SchemaHistoryRow.Version 的 Length=200 与约定叠加），方案 C 完全不可用。
+                                // 归零即可 —— 长度已经写在类型串里了。
+                                column.Length = 0;
                             }
                         }
 
-                        // 可空性：显式设置 DataType 会丢掉它（曾把可空列建成 NOT NULL）；按 CLR 类型补回，与 EF 默认一致
-                        if (property.PropertyType.IsClass || Nullable.GetUnderlyingType(property.PropertyType) is not null)
+                        // 可空性：显式设置 DataType 会丢掉它（曾把可空列建成 NOT NULL）；按 CLR 类型补回，与 EF 默认一致。
+                        // 但**作者显式写下的 IsNullable 不能被吞掉**：SqlSugar 的 SugarColumn.IsNullable 是 bool
+                        // （默认 false），拿到特性实例后区分不出「显式写了 false」与「压根没配」——
+                        // 因此判据看元数据（CustomAttributeData.NamedArguments 只含作者真正写下的实参）。
+                        if (!HasExplicitNullability(property)
+                            && (property.PropertyType.IsClass || Nullable.GetUnderlyingType(property.PropertyType) is not null))
                         {
                             column.IsNullable = true;
+                        }
+
+                        // 框架基类成员的列名必须与 CONTRACT.md §6 冻结的 6 个列名一致
+                        // （id / created_at / row_version / updated_at / created_by / updated_by）。
+                        // 这 6 个属性声明在 CloudL.Core 的基类上，业务实体**无法**给它们挂
+                        // [SugarColumn(ColumnName=...)]；EF 侧靠 BaseEntityConfiguration 的 HasColumnName
+                        // 声明，SqlSugar 看不到那份配置 —— 于是列名会退化成 CREATEDAT / ROWVERSION /
+                        // UPDATEDAT / CREATEDBY / UPDATEDBY，与现有库对不上，ORM 直接读不了表。
+                        // 只在业务实体**没有显式声明 ColumnName** 时补默认值（显式声明优先）。
+                        if (string.IsNullOrWhiteSpace(sugarColumn?.ColumnName)
+                            && GetBaseClassColumnName(property) is { } baseColumnName)
+                        {
+                            column.DbColumnName = baseColumnName;
                         }
 
                         // 主键：框架把主键定义在 Entity<TKey>.Id 上（EF 侧由 BaseEntityConfiguration 声明），
@@ -109,6 +152,28 @@ public static class SqlSugarModule
                             && declaring.GetGenericTypeDefinition() == typeof(Entity<>))
                         {
                             column.IsPrimarykey = true;
+
+                            // Guid 主键的列类型必须跟**EF 侧建出来的库**一致，否则 InitTables 会反复 ALTER。
+                            // SqlSugar 默认给 varchar(36)，与 EF 各 provider 的实际映射都不同：
+                            //   达梦 CHAR(36)（实测现有库如此）｜PostgreSQL uuid｜SqlServer uniqueidentifier｜
+                            //   MySql char(36)｜Oracle 保持 SqlSugar 默认（未验证，不猜）。
+                            if (property.PropertyType == typeof(Guid))
+                            {
+                                var guidDataType = dbType switch
+                                {
+                                    global::SqlSugar.DbType.Dm => "CHAR(36)",
+                                    global::SqlSugar.DbType.PostgreSQL => "uuid",
+                                    global::SqlSugar.DbType.SqlServer => "uniqueidentifier",
+                                    global::SqlSugar.DbType.MySql => "char(36)",
+                                    _ => null
+                                };
+
+                                if (guidDataType is not null)
+                                {
+                                    column.DataType = guidDataType;
+                                    column.Length = 0;   // 类型串自带括号，别让 SqlSugar 再拼一次
+                                }
+                            }
                         }
 
                         // 忽略规则来自 CloudL.Core 的中立声明（NotPersistedAttribute），不依赖任何具体 ORM 的配置
@@ -116,18 +181,29 @@ public static class SqlSugarModule
                         {
                             column.IsIgnore = true;
                         }
+
+                        // 主键不可能为 NULL —— 达梦/Oracle 的数据字典对主键列一律报 NOT NULL（实测
+                        // ALL_TAB_COLUMNS.NULLABLE = 'N'），而模型侧的 IsNullable 若为 true
+                        // （string 主键会走上面「引用类型默认可空」那条规则），SqlSugar 每次 InitTables
+                        // 都会生成 ALTER TABLE ... modify (... null ...) 想把列改回可空，
+                        // 达梦直接报「无效的表[...]约束」→ **第二次 InitTables 必崩**：
+                        // 迁移执行器第二遍就起不来（第一遍建表成功、第二遍改结构失败）。
+                        // 按主键语义强制 NOT NULL，让模型与数据字典一致。
+                        if (column.IsPrimarykey)
+                        {
+                            column.IsNullable = false;
+                        }
                     }
                 }            },
             client =>
             {
                 if (options.EnableSqlLog)
-                    if (options.EnableSqlLog)
-                    {
-                        var logger = serviceProvider.GetService<ILoggerFactory>()?.CreateLogger("CloudL.SqlSugar");
+                {
+                    var logger = serviceProvider.GetService<ILoggerFactory>()?.CreateLogger("CloudL.SqlSugar");
 
-                        client.Aop.OnLogExecuting = (sql, _) =>
-                            logger?.LogDebug("SqlSugar 执行 SQL：{Sql}", sql);
-                    }
+                    client.Aop.OnLogExecuting = (sql, _) =>
+                        logger?.LogDebug("SqlSugar 执行 SQL：{Sql}", sql);
+                }
             }));
 
         // 通用仓储与工作单元（与 EF 版同一份契约）
@@ -151,6 +227,73 @@ public static class SqlSugarModule
         }
 
         return services;
+    }
+
+    /// <summary>
+    /// 作者是否<strong>显式</strong>写过 <c>SugarColumn.IsNullable</c>。
+    /// </summary>
+    /// <remarks>
+    /// <para><c>SugarColumn.IsNullable</c> 是 <c>bool</c>、默认 <c>false</c>，所以拿到特性<strong>实例</strong>后
+    /// 区分不出「作者显式写了 <c>false</c>」与「作者压根没配」—— 而这两种情况的期望完全相反：
+    /// 前者要建 <c>NOT NULL</c>（如项目的 <c>code</c> / <c>name</c>），后者要按 CLR 类型补成可空
+    /// （与 EF 默认一致，否则 <c>[SugarColumn(ColumnDataType="NVARCHAR2(50)")]</c> 这种只写类型的地方会被误建成 NOT NULL）。</para>
+    /// <para>因此判据必须看<strong>元数据</strong>：<see cref="CustomAttributeData.NamedArguments"/> 只包含
+    /// 作者真正写下的命名实参（<c>[SugarColumn(IsNullable = false)]</c> 有，<c>[SugarColumn(ColumnDataType = "...")]</c> 没有）。</para>
+    /// </remarks>
+    private static bool HasExplicitNullability(PropertyInfo property) =>
+        property.GetCustomAttributesData().Any(data =>
+            data.AttributeType == typeof(SugarColumn)
+            && data.NamedArguments.Any(argument => argument.MemberName == nameof(SugarColumn.IsNullable)));
+
+    /// <summary>
+    /// 框架基类成员对应的数据库列名（<c>id</c> / <c>created_at</c> / <c>row_version</c> /
+    /// <c>updated_at</c> / <c>created_by</c> / <c>updated_by</c>，见 CONTRACT.md §6）。
+    /// </summary>
+    /// <remarks>
+    /// 这 6 个属性声明在 <c>CloudL.Core</c> 的基类上（<c>Entity</c> / <c>Entity&lt;TKey&gt;</c> /
+    /// <c>AuditableEntity</c> / <c>AuditableEntity&lt;TKey&gt;</c>），业务实体<strong>无法</strong>给它们挂
+    /// <c>[SugarColumn(ColumnName = ...)]</c>（那会往 Core 引 SqlSugar 依赖）。EF 侧由
+    /// <c>BaseEntityConfiguration</c> 的 <c>HasColumnName</c> 声明，SqlSugar 看不到那份配置，
+    /// 于是列名退化成 <c>CREATEDAT</c> / <c>ROWVERSION</c> / <c>UPDATEDAT</c> / <c>CREATEDBY</c> / <c>UPDATEDBY</c>，
+    /// 与现有库的 <c>created_at</c> / <c>row_version</c> / … 对不上 —— 表现为 ORM 读不了这些列。
+    /// </remarks>
+    private static string? GetBaseClassColumnName(PropertyInfo property)
+    {
+        var declaringType = property.DeclaringType;
+        if (declaringType is null)
+            return null;
+
+        var definition = declaringType.IsGenericType
+            ? declaringType.GetGenericTypeDefinition()
+            : declaringType;
+
+        if (definition == typeof(Entity))
+        {
+            return property.Name switch
+            {
+                nameof(Entity.CreatedAt) => "created_at",
+                nameof(Entity.RowVersion) => "row_version",
+                _ => null
+            };
+        }
+
+        if (definition == typeof(Entity<>))
+        {
+            return property.Name == nameof(Entity<Guid>.Id) ? "id" : null;
+        }
+
+        if (definition == typeof(AuditableEntity) || definition == typeof(AuditableEntity<>))
+        {
+            return property.Name switch
+            {
+                nameof(IAuditable.UpdatedAt) => "updated_at",
+                nameof(IAuditable.CreatedBy) => "created_by",
+                nameof(IAuditable.UpdatedBy) => "updated_by",
+                _ => null
+            };
+        }
+
+        return null;
     }
 
     /// <summary>

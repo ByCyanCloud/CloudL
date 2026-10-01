@@ -135,7 +135,14 @@ public sealed class SchemaHistoryRow
     public const string SchemaHistoryTableName = "__cloudl_schema_history";
 
     /// <summary>版本号（脚本文件名，不含扩展名）。</summary>
-    [SugarColumn(IsPrimaryKey = true, Length = 200)]
+    /// <remarks>
+    /// <strong>不要在这里写 <c>Length</c></strong>：本列的 <c>DataType</c> 由 <c>SqlSugarModule.EntityService</c>
+    /// 写成完整类型串（达梦为 <c>NVARCHAR2(256)</c>），SqlSugar 建表时还会再拼一次 <c>Length</c>，
+    /// 于是生成 <c>"VERSION" NVARCHAR2(256)(200)</c> —— 达梦报「语法分析出错」，
+    /// <strong>迁移执行器连自己的历史表都建不出来</strong>（方案 C 第一步即崩）。
+    /// 长度已包含在类型串里，这里不重复声明。
+    /// </remarks>
+    [SugarColumn(IsPrimaryKey = true)]
     public string Version { get; set; } = string.Empty;
 
     /// <summary>应用时间（墙上钟，<c>Kind=Unspecified</c>）。</summary>

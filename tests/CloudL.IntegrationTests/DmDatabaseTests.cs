@@ -49,9 +49,9 @@ public class DmDatabaseTests
 
         // 达梦兼容 Oracle 数据字典；标识符默认大写
         var rows = await client.Ado.SqlQueryAsync<dynamic>(
-            "SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, NULLABLE FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = 'DMCONVENTIONITEM'");
+            "SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, CHAR_LENGTH, NULLABLE FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = 'DMCONVENTIONITEM'");
 
-        var columns = new Dictionary<string, (string Type, long Length, string Nullable)>(StringComparer.OrdinalIgnoreCase);
+        var columns = new Dictionary<string, (string Type, long Length, long CharLength, string Nullable)>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var row in rows)
         {
@@ -60,6 +60,7 @@ public class DmDatabaseTests
             columns[Convert.ToString(map["COLUMN_NAME"])!] = (
                 Convert.ToString(map["DATA_TYPE"]) ?? string.Empty,
                 Convert.ToInt64(map["DATA_LENGTH"]),
+                Convert.ToInt64(map["CHAR_LENGTH"]),
                 Convert.ToString(map["NULLABLE"]) ?? string.Empty);
         }
 
@@ -69,13 +70,25 @@ public class DmDatabaseTests
         Assert.Contains("TIMESTAMP", columns["MOMENT"].Type, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("TIME ZONE", columns["MOMENT"].Type, StringComparison.OrdinalIgnoreCase);
 
-        // 字符串默认长度与 EF 侧同一个常量（256）
-        Assert.Contains("VARCHAR", columns["NAME"].Type, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(256L, columns["NAME"].Length);
+        // 字符串默认长度与 EF 侧同一个常量（256）。
+        // 达梦的 VARCHAR(n) 按**字节**计（UTF-8 下一个汉字 3 字节），NVARCHAR2(n) 按**字符**计 ——
+        // 框架给达梦的约定**必须是 NVARCHAR2(256)**，否则同一份 256 长度中文只能装 85 字，
+        // 与现有库里 NVARCHAR2(n) 的列（中文按字计）对不上。所以断言字符数而不是字节数：
+        // 实测 NVARCHAR2(256) 的 DATA_LENGTH = 1024（字节），CHAR_LENGTH = 256（字符）。
+        Assert.Equal("NVARCHAR2", columns["NAME"].Type, ignoreCase: true);
+        Assert.Equal(256L, columns["NAME"].CharLength);
 
         // 可空列必须真的可空
         Assert.Equal("Y", columns["OPTIONALMOMENT"].Nullable.ToUpperInvariant());
         Assert.Equal("Y", columns["NAME"].Nullable.ToUpperInvariant());
+
+        // 框架基类字段的列名是 CONTRACT.md §6 冻结的 snake_case（不是 CREATEDAT / ROWVERSION），
+        // 否则 ORM 读不了现有库里 created_at / row_version 这些列
+        Assert.True(columns.ContainsKey("CREATED_AT"), "框架基类字段 CreatedAt 必须映射为 created_at");
+        Assert.True(columns.ContainsKey("ROW_VERSION"), "框架基类字段 RowVersion 必须映射为 row_version");
+
+        // Guid 主键必须是 CHAR(36)（与现有库一致，而不是 SqlSugar 默认的 varchar(36)）
+        Assert.Equal("CHAR", columns["ID"].Type, ignoreCase: true);
 
         // [NotPersisted] 成员不得建列
         Assert.False(columns.ContainsKey("DOMAINEVENTS"));
@@ -124,6 +137,55 @@ public class DmDatabaseTests
         // 清理
         await repository.DeleteByIdAsync(item.Id);
     }
+
+    /// <summary>
+    /// 重复 <c>InitTables</c> 不得试图把主键改成可空（达梦把主键列一律报 NOT NULL，模型若认为可空，
+    /// SqlSugar 会生成 <c>ALTER TABLE ... modify (... null ...)</c>，达梦报「无效的表[...]约束」——
+    /// 表现为 <strong>第二次 InitTables / 第二次跑迁移执行器必崩</strong>）。
+    /// </summary>
+    /// <remarks>
+    /// 必须先建表一次、再跑一次才会触发（第一次是 CREATE，看不出问题），所以这里显式跑两遍。
+    /// 用 string 主键：<c>Guid</c> 主键本来就是非空类型，盖不住这条规则。
+    /// </remarks>
+    [DmFact]
+    public async Task Dm_SecondInitTables_WithStringPrimaryKey_ShouldNotFail()
+    {
+        if (!IsConfigured)
+            return;
+
+        await using var provider = BuildProvider();
+
+        var client = provider.GetRequiredService<global::SqlSugar.ISqlSugarClient>();
+
+        try
+        {
+            client.Ado.ExecuteCommand("DROP TABLE IF EXISTS \"T_CLOUDL_DM_STRINGKEY\"");
+
+            client.CodeFirst.InitTables<DmStringKeyItem>();
+            client.CodeFirst.InitTables<DmStringKeyItem>();
+
+            var rows = await client.Ado.SqlQueryAsync<dynamic>(
+                "SELECT COLUMN_NAME, NULLABLE FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = 'T_CLOUDL_DM_STRINGKEY'");
+
+            var columns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in rows)
+            {
+                var map = (IDictionary<string, object>)row;
+
+                columns[Convert.ToString(map["COLUMN_NAME"])!] = Convert.ToString(map["NULLABLE"]) ?? string.Empty;
+            }
+
+            Assert.NotEmpty(columns);
+
+            // 主键列在数据字典里必须是 NOT NULL（与模型一致，第二次 InitTables 才不会去 ALTER 它）
+            Assert.Equal("N", columns["ID"].ToUpperInvariant());
+        }
+        finally
+        {
+            client.Ado.ExecuteCommand("DROP TABLE IF EXISTS \"T_CLOUDL_DM_STRINGKEY\"");
+        }
+    }
 }
 
 /// <summary>
@@ -156,6 +218,13 @@ public sealed class DmConventionItem : Entity<Guid>
 
 /// <summary>达梦 CRUD 测试实体。</summary>
 public sealed class DmCrudItem : Entity<Guid>
+{
+    public string Name { get; set; } = string.Empty;
+}
+
+/// <summary>达梦 string 主键测试实体（历史表 / 复合主键业务实体的形状）。</summary>
+[global::SqlSugar.SugarTable("T_CLOUDL_DM_STRINGKEY")]
+public sealed class DmStringKeyItem : Entity<string>
 {
     public string Name { get; set; } = string.Empty;
 }

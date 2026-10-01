@@ -21,7 +21,9 @@ namespace CloudL.IntegrationTests;
 /// <para><strong>仍未覆盖的（需要在真实数据库上验证）</strong>：PostgreSQL / SqlServer / <strong>达梦</strong> /
 /// Oracle / MySql 各自的列类型串（<c>timestamp without time zone</c> / <c>datetime2</c> / <c>TIMESTAMP</c> /
 /// <c>VARCHAR2(256)</c> / <c>varchar(256)</c>）无法在离线环境生成 DDL，只能在对应数据库上跑一次：
-/// 执行 <c>EnableInitTables</c>（或迁移脚本）后检查 <c>information_schema</c>。达梦尤其要在联调时确认。</para>
+/// 执行 <c>EnableInitTables</c>（或迁移脚本）后检查 <c>information_schema</c>。达梦侧见
+/// <c>DmDatabaseTests</c>（字符串约定是 <c>NVARCHAR2(256)</c>：达梦 <c>VARCHAR(n)</c> 按字节计，
+/// 256 只装得下 85 个汉字；<c>NVARCHAR2(n)</c> 按字符计）。</para>
 /// </remarks>
 public class SqlSugarColumnConventionTests : IDisposable
 {
@@ -86,6 +88,15 @@ public class SqlSugarColumnConventionTests : IDisposable
         // 引用类型默认可空（与 EF 一致）
         Assert.Equal(0L, byName["Name"].NotNull);
 
+        // 作者**显式**写了 IsNullable = false 时，约定不得把它吞掉（此前对引用类型无条件补 true，
+        // 结果任何 string 都建不出 NOT NULL）。SqlSugar 的 SugarColumn.IsNullable 是 bool 默认 false，
+        // 所以框架改看元数据（CustomAttributeData.NamedArguments）区分「显式 false」与「没配」。
+        Assert.Equal(1L, byName["RequiredName"].NotNull);
+
+        // 反向守卫：只写了 ColumnDataType、**没写** IsNullable 的可空类型，仍必须是 NULL
+        // （否则「看特性有没有写 IsNullable」会被误实现成「只要有 SugarColumn 特性就 NOT NULL」）
+        Assert.Equal(0L, byName["TypedOptional"].NotNull);
+
         // [NotPersisted] 成员不得建列
         Assert.False(byName.ContainsKey("DomainEvents"), "DomainEvents 标了 [NotPersisted]，不应成为列");
     }
@@ -95,6 +106,14 @@ public class SqlSugarColumnConventionTests : IDisposable
 public sealed class ConventionTestItem : Entity<Guid>
 {
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>显式要求 NOT NULL 的字符串（作者写了 <c>IsNullable = false</c>）。</summary>
+    [global::SqlSugar.SugarColumn(IsNullable = false)]
+    public string RequiredName { get; set; } = string.Empty;
+
+    /// <summary>只写了类型、没写可空性 —— 约定必须按 CLR 类型补成可空。</summary>
+    [global::SqlSugar.SugarColumn(ColumnDataType = "TEXT")]
+    public string? TypedOptional { get; set; }
 
     public DateTime Moment { get; set; }
 
