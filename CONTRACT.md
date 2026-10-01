@@ -268,3 +268,15 @@ services.AddCloudLEntityFrameworkCore<AppDbContext>(options =>
 ⚠️ **拼接顺序与格式不可更改**：`Sha256SaltedHash` 是"**盐在前、明文在后**"（`SHA256(盐 ‖ UTF8(明文))`）。
 改顺序或改格式会让**所有存量哈希失效** —— 单元测试里有钉子用例固定这一点（用测试中独立构造的格式串校验）。
 
+---
+
+## SqlSugar × 达梦：实测踩坑（真库验证得出，务必先读）
+
+| 现象 | 原因 | 做法 |
+|---|---|---|
+| ORM 报「无效的表或视图名」，原生 SQL 却读得到 | 达梦 `CASE_SENSITIVE=1` 且库表为小写，SqlSugar 默认把标识符转大写 | `SqlSugarOptions.IsAutoToUpper = false` |
+| 汉字超长报错（85 个汉字就满） | 达梦 `VARCHAR(n)` 按**字节**计 | 框架已改用 `NVARCHAR2(256)`（按字符计，与 EF `IsUnicode(true)` 一致） |
+| 建表报「语法分析出错」/ 历史表都建不出来 | SqlSugar 把 `Length` **再拼一次** → `NVARCHAR2(256)(200)` | 框架写完整类型串时把 `Length` 归零 |
+| **第二次** `InitTables` 必崩（改可空报「无效的表约束」） | 主键列在数据字典里恒为 NOT NULL，模型侧若可空会生成 `modify ... null` | 主键列强制 `IsNullable = false` |
+| 表结构与实体对不齐、反复 ALTER | SqlSugar 默认 `varchar(36)` 与 EF 建出的 Guid 列类型不一致 | 按 provider 对齐：达梦 `CHAR(36)` / PostgreSQL `uuid` / SqlServer `uniqueidentifier` / MySql `char(36)` |
+
