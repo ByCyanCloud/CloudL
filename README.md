@@ -191,7 +191,7 @@ await _unitOfWork.ExecuteInTransactionAsync(async ct =>
 
 ```xml
 <EnablePackageValidation>true</EnablePackageValidation>
-<PackageValidationBaselineVersion>0.7.1</PackageValidationBaselineVersion>
+<PackageValidationBaselineVersion>0.7.2</PackageValidationBaselineVersion>
 ```
 
 - 目的不是"禁止破坏"，而是**让每一次破坏都必须是有意识的**：手滑删掉一个 public 成员会直接让打包失败。
