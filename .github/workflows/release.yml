@@ -123,49 +123,31 @@ jobs:
       - name: 校验已发布（轮询包索引，未出现即失败）
         shell: pwsh
         run: |
-          # 从 local-feed 里本次打包出的每个 .nupkg 推导「包 id + 版本」，逐个等待其在索引中出现。
-          # 不再写死包名：2026-09-29 就发生过「新增包被漏打包→漏推送，而校验只盯两个老包，于是 run 是绿的」。
+          # 用搜索 API（azuresearch-usnc）而不是 flatcontainer：后者在 GitHub runner 上会被重定向到
+          # nuget.azure.cn 这个已证实滞后的镜像，导致"包其实推成功了、校验却失败"的假警报（2026-09-30 实际发生）。
           $tag = "${{ inputs.tag || github.ref_name }}".TrimStart('v')
           $files = @(Get-ChildItem 'local-feed/*.nupkg' -ErrorAction SilentlyContinue)
-          if ($files.Count -eq 0) {
-            Write-Host "::error::local-feed 中没有 .nupkg，无法校验发布结果"
-            exit 1
-          }
+          if ($files.Count -eq 0) { Write-Host "::error::local-feed 中没有 .nupkg"; exit 1 }
           $failed = 0
           $matched = 0
+          $deadline = (Get-Date).AddMinutes(15)   # 整体截止时间，而不是"每包各自 30 次"
           foreach ($file in $files) {
-            if ($file.BaseName -notmatch '^(?<id>.+?)\.(?<ver>\d+\.\d+\.\d+.*)$') {
-              Write-Host "::error::无法从文件名解析包 id 与版本：$($file.Name)"
-              $failed = 1
-              continue
-            }
-            $id = $Matches['id'].ToLowerInvariant()
-            $version = $Matches['ver']
-            if ($version -ne $tag) {
-                # local-feed 里可能有历史版本（本地开发时）；只有本次标签版本的包才需要校验。
-                Write-Host "跳过 $id $version（不是本次标签 $tag 的产物）"
-                continue
-            }
+            if ($file.BaseName -notmatch '^(?<id>.+?)\.(?<ver>\d+\.\d+\.\d+.*)$') { Write-Host "::error::无法解析文件名 $($file.Name)"; $failed = 1; continue }
+            $id = $Matches['id']; $version = $Matches['ver']
+            if ($version -ne $tag) { Write-Host "跳过 $id $version（非本次标签 $tag 产物）"; continue }
             $matched++
-            $url = "https://api.nuget.org/v3-flatcontainer/$id/index.json"
-            $found = $false
-            for ($i = 1; $i -le 30; $i++) {
+            $url = "https://azuresearch-usnc.nuget.org/query?q=packageid:$id&prerelease=true"
+            $ok = $false
+            while ((Get-Date) -lt $deadline) {
               try {
-                $index = Invoke-RestMethod -Uri $url -TimeoutSec 30
-                if ($index.versions -contains $version) { $found = $true; break }
+                $r = Invoke-RestMethod -Uri $url -TimeoutSec 30
+                if ($r.data.Count -gt 0 -and $r.data[0].version -eq $version) { $ok = $true; break }
               } catch { }
               Start-Sleep -Seconds 20
             }
-            if (-not $found) {
-              Write-Host "::error::$id $version 在 10 分钟内仍未出现在 $url —— push 步骤实际没有推成功"
-              $failed = 1
-            } else {
-              Write-Host "$id $version 已上架 ✅"
-            }
+            if ($ok) { Write-Host "$id $version 已上架 OK" }
+            else { Write-Host "::error::$id $version 未在截止时间内出现（搜索 API）"; $failed = 1 }
           }
-          if ($matched -eq 0) {
-            Write-Host "::error::local-feed 中没有任何包的版本等于标签 $tag —— 打包版本号不对"
-            exit 1
-          }
-          Write-Host "本次已校验 $matched 个包（版本 $tag）"
+          if ($matched -eq 0) { Write-Host "::error::local-feed 中没有任何包的版本等于标签 $tag"; exit 1 }
+          Write-Host "本次校验 $matched 个包（版本 $tag）"
           exit $failed
