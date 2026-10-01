@@ -5,7 +5,8 @@
 - **达梦字符串列改用 `NVARCHAR2(256)`**（原 `VARCHAR(256)`）：达梦的 `VARCHAR(n)` 按**字节**计，256 字节只装得下 85 个汉字；`NVARCHAR2(n)` 按**字符**计，与 EF 侧 `IsUnicode(true)` 意图一致。⚠️ **已有达梦库的字符串列类型会因此变化**，请核对/迁移。
 - **Guid 主键列类型按 provider 对齐 EF 建出的库**：达梦 `CHAR(36)`、PostgreSQL `uuid`、SqlServer `uniqueidentifier`、MySql `char(36)`（Oracle 保持 SqlSugar 默认，未验证）。此前 SqlSugar 默认 `varchar(36)` 与 EF 各 provider 都不一致，会让 `InitTables` 反复 ALTER。
 - **新增 `SqlSugarOptions.IsAutoToUpper`**（默认 `true`，即 SqlSugar 原默认）：达梦实例 `CASE_SENSITIVE=1` 且库表为小写时**必须设为 `false`** —— 否则 ORM 去找 `"ORGANIZATIONS"` 而库里是 `"organizations"`，报「无效的表或视图名」；而原生 SQL 用引号小写却正常，极易误判为数据没同步。
-- 修复**类型串被重复拼长度**：SqlSugar 会把 `column.Length` 再拼一次 → `NVARCHAR2(256)(200)`（达梦语法错），连迁移执行器自己的历史表都建不出来；框架自己写完整类型串时把 `Length` 归零。
+- 修复**类型串被重复拼长度**：SqlSugar 会把 `column.Length` 再拼一次 → `NVARCHAR2(256)(200)`（达梦语法错），连迁移执行器自己的历史表都建不出来。规则改为**按类型串是否自带括号统一判断** —— 框架自己写的完整类型串与**作者显式写的** `[SugarColumn(ColumnDataType="NVARCHAR2(256)", Length=200)]` 一视同仁（后者此前漏网）。
+- **迁移历史表版本列加长到 512**（原为默认 256）：`SchemaHistoryRow.Version` 存的是**脚本文件名**，长文件名不能被静默截断成同一个版本号。
 - 主键列强制 `NOT NULL`（模型与数据字典一致），否则**第二次** `InitTables` 会生成改可空的 ALTER 并在达梦上报错。
 
 # 更新日志

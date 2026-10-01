@@ -134,15 +134,25 @@ public sealed class SchemaHistoryRow
     /// <summary>历史表名。</summary>
     public const string SchemaHistoryTableName = "__cloudl_schema_history";
 
+    /// <summary>版本列的最大长度（字符数）。</summary>
+    /// <remarks>
+    /// <strong>脚本文件名即版本号</strong>：版本号长度 = 文件名长度（如 <c>0001_init</c>），
+    /// 长文件名不能被静默截断成默认的 <c>AppConstants.DefaultStringMaxLength</c>（256）——
+    /// 截断后两个不同脚本会撞成同一个版本号，迁移记录直接失真。故显式放大到 512。
+    /// </remarks>
+    public const int VersionMaxLength = 512;
+
     /// <summary>版本号（脚本文件名，不含扩展名）。</summary>
     /// <remarks>
-    /// <strong>不要在这里写 <c>Length</c></strong>：本列的 <c>DataType</c> 由 <c>SqlSugarModule.EntityService</c>
-    /// 写成完整类型串（达梦为 <c>NVARCHAR2(256)</c>），SqlSugar 建表时还会再拼一次 <c>Length</c>，
-    /// 于是生成 <c>"VERSION" NVARCHAR2(256)(200)</c> —— 达梦报「语法分析出错」，
-    /// <strong>迁移执行器连自己的历史表都建不出来</strong>（方案 C 第一步即崩）。
-    /// 长度已包含在类型串里，这里不重复声明。
+    /// <para><strong>长度必须写在这里</strong>：<c>SqlSugarModule.EntityService</c> 的列约定会把它
+    /// 拼进完整类型串（达梦 <c>NVARCHAR2(512)</c>、PG <c>character varying(512)</c>…），
+    /// 然后把 <c>column.Length</c> 归零；不写 <c>Length</c> 就只能是默认的 256。</para>
+    /// <para><strong>归零是必须的</strong>：类型串自带括号时若还留着 <c>Length</c>，SqlSugar 建表会再拼一次 →
+    /// <c>"VERSION" NVARCHAR2(512)(512)</c> → 达梦报「语法分析出错」，<strong>迁移执行器连自己的历史表都建不出来</strong>
+    /// （方案 C 第一步即崩）。这条规则由 <c>EntityService</c> 统一兜住：
+    /// 框架写下的类型串与作者 <c>ColumnDataType</c> 写下的类型串一视同仁。</para>
     /// </remarks>
-    [SugarColumn(IsPrimaryKey = true)]
+    [SugarColumn(IsPrimaryKey = true, Length = VersionMaxLength)]
     public string Version { get; set; } = string.Empty;
 
     /// <summary>应用时间（墙上钟，<c>Kind=Unspecified</c>）。</summary>

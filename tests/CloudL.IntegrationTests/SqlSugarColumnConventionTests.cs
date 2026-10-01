@@ -61,6 +61,10 @@ public class SqlSugarColumnConventionTests : IDisposable
     {
         var client = _provider.GetRequiredService<global::SqlSugar.ISqlSugarClient>();
 
+        // 抓真实下发的建表 SQL（达梦那边就是这条 SQL 报「语法分析出错」的）
+        var executed = new List<string>();
+        client.Aop.OnLogExecuting = (sql, _) => executed.Add(sql);
+
         // 走真实建表路径（会应用 ConfigureExternalServices）
         client.CodeFirst.InitTables<ConventionTestItem>();
 
@@ -97,6 +101,20 @@ public class SqlSugarColumnConventionTests : IDisposable
         // （否则「看特性有没有写 IsNullable」会被误实现成「只要有 SugarColumn 特性就 NOT NULL」）
         Assert.Equal(0L, byName["TypedOptional"].NotNull);
 
+        // 类型串自带括号 ⇒ Length 必须归零（此前只覆盖「框架自己写的类型串」，作者的写法漏网）：
+        // [SugarColumn(ColumnDataType = "NVARCHAR2(256)", Length = 200)] 会被 SqlSugar 拼成
+        // NVARCHAR2(256)(200) —— 达梦报「语法分析出错」，SQLite 也直接语法错（建表就抛异常）。
+        // 作者显式写的类型串，最终列类型必须**恰好**是作者写的那一串，长度不多不少。
+        Assert.Equal("NVARCHAR2(256)", byName["TypedWithLength"].Type);
+        Assert.DoesNotContain(")(", byName["TypedWithLength"].Type);
+
+        // 断言到生成的建表 SQL 本身（不只是读回的类型列）：整条 DDL 里不得出现 ")("
+        var createSql = executed.Single(sql =>
+            sql.Contains("CREATE TABLE", StringComparison.OrdinalIgnoreCase)
+            && sql.Contains("TypedWithLength", StringComparison.Ordinal));
+
+        Assert.DoesNotContain(")(", createSql);
+
         // [NotPersisted] 成员不得建列
         Assert.False(byName.ContainsKey("DomainEvents"), "DomainEvents 标了 [NotPersisted]，不应成为列");
     }
@@ -114,6 +132,14 @@ public sealed class ConventionTestItem : Entity<Guid>
     /// <summary>只写了类型、没写可空性 —— 约定必须按 CLR 类型补成可空。</summary>
     [global::SqlSugar.SugarColumn(ColumnDataType = "TEXT")]
     public string? TypedOptional { get; set; }
+
+    /// <summary>
+    /// 作者显式写了<strong>自带括号</strong>的完整类型串**又**写了 <c>Length</c> —— SqlSugar 建表时会把
+    /// <c>Length</c> 再拼一次，生成 <c>NVARCHAR2(256)(200)</c>（达梦/SQLite 都报语法错）。
+    /// 框架必须把这种 <c>Length</c> 归零（规则对作者写的类型串与框架写的类型串一视同仁）。
+    /// </summary>
+    [global::SqlSugar.SugarColumn(ColumnDataType = "NVARCHAR2(256)", Length = 200)]
+    public string TypedWithLength { get; set; } = string.Empty;
 
     public DateTime Moment { get; set; }
 

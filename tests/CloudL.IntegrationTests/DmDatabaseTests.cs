@@ -139,6 +139,92 @@ public class DmDatabaseTests
     }
 
     /// <summary>
+    /// 迁移历史表（方案 C 的第一步）必须能在真库上建出来，且版本列不被截断。
+    /// </summary>
+    /// <remarks>
+    /// <para>覆盖两件事：</para>
+    /// <list type="number">
+    /// <item>类型串自带括号 ⇒ <c>Length</c> 必须归零：否则 SqlSugar 会拼成 <c>NVARCHAR2(512)(512)</c>，
+    /// 达梦报「语法分析出错」，<strong>历史表根本建不出来</strong>（迁移执行器第一步即崩）；</item>
+    /// <item>版本列长度 512（<strong>脚本文件名即版本号</strong>，长文件名不能被截断成默认的 256）。</item>
+    /// </list>
+    /// <para>重复建两次：第一次 CREATE、第二次只剩差异 ALTER，顺带守住「主键列不得被改成可空」那条规则。</para>
+    /// <para>⚠️ 本用例会 <c>DROP</c> 并重建 <c>__cloudl_schema_history</c>：
+    /// 它只在显式配置了 <c>CLOUDL_DM_CONNECTION</c> 时运行，<strong>请把连接串指向测试库</strong>。</para>
+    /// </remarks>
+    [DmFact]
+    public async Task Dm_SchemaHistoryTable_ShouldBeCreatableAndKeepLongVersion()
+    {
+        if (!IsConfigured)
+            return;
+
+        await using var provider = BuildProvider();
+
+        var client = provider.GetRequiredService<global::SqlSugar.ISqlSugarClient>();
+
+        // 从干净状态开始：残留的历史表可能还是旧长度（默认 256），会让下面的断言读到旧结构。
+        // 标识符不带引号（达梦按实例规则折叠成大写），与 SqlSugar 建出的表名一致 —— 见
+        // Dm_SecondInitTables_WithStringPrimaryKey_ShouldNotFail 里的说明。
+        var historyTableSql = SchemaHistoryRow.SchemaHistoryTableName.ToUpperInvariant();
+
+        client.Ado.ExecuteCommand($"DROP TABLE IF EXISTS {historyTableSql}");
+
+        client.CodeFirst.InitTables<SchemaHistoryRow>();
+        client.CodeFirst.InitTables<SchemaHistoryRow>();
+
+        var rows = await client.Ado.SqlQueryAsync<dynamic>(
+            "SELECT COLUMN_NAME, DATA_TYPE, CHAR_LENGTH, NULLABLE FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = '" +
+            historyTableSql + "'");
+
+        var columns = new Dictionary<string, (string Type, long CharLength, string Nullable)>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in rows)
+        {
+            var map = (IDictionary<string, object>)row;
+
+            columns[Convert.ToString(map["COLUMN_NAME"])!] = (
+                Convert.ToString(map["DATA_TYPE"]) ?? string.Empty,
+                Convert.ToInt64(map["CHAR_LENGTH"]),
+                Convert.ToString(map["NULLABLE"]) ?? string.Empty);
+        }
+
+        Assert.NotEmpty(columns);
+
+        // 达梦 NVARCHAR2(n) 按**字符**计：CHAR_LENGTH 必须正好是约定的 512（不是默认的 256）
+        Assert.Equal("NVARCHAR2", columns["VERSION"].Type, ignoreCase: true);
+        Assert.Equal((long)SchemaHistoryRow.VersionMaxLength, columns["VERSION"].CharLength);
+
+        // 主键列在数据字典里恒为 NOT NULL（否则第二次 InitTables 会去 ALTER 它而报「无效的表约束」）
+        Assert.Equal("N", columns["VERSION"].Nullable.ToUpperInvariant());
+
+        // 长度不能只是"写着好看"：真插一条 400 字符的版本号（文件名级），必须原样读回、不被截断
+        var longVersion = new string('v', 400);
+
+        try
+        {
+            await client.Insertable(new SchemaHistoryRow
+            {
+                Version = longVersion,
+                AppliedAt = CloudL.Domain.Shared.Time.CloudLTime.Now()
+            }).ExecuteCommandAsync();
+
+            var stored = await client.Queryable<SchemaHistoryRow>()
+                .Where(row => row.Version == longVersion)
+                .CountAsync();
+
+            Assert.Equal(1, stored);
+        }
+        finally
+        {
+            await client.Deleteable<SchemaHistoryRow>()
+                .Where(row => row.Version == longVersion)
+                .ExecuteCommandAsync();
+
+            client.Ado.ExecuteCommand($"DROP TABLE IF EXISTS {historyTableSql}");
+        }
+    }
+
+    /// <summary>
     /// 重复 <c>InitTables</c> 不得试图把主键改成可空（达梦把主键列一律报 NOT NULL，模型若认为可空，
     /// SqlSugar 会生成 <c>ALTER TABLE ... modify (... null ...)</c>，达梦报「无效的表[...]约束」——
     /// 表现为 <strong>第二次 InitTables / 第二次跑迁移执行器必崩</strong>）。
@@ -159,7 +245,15 @@ public class DmDatabaseTests
 
         try
         {
-            client.Ado.ExecuteCommand("DROP TABLE IF EXISTS \"T_CLOUDL_DM_STRINGKEY\"");
+            // 标识符大小写必须与建表、查询用**同一种**写法：本文件全部**不带引号**。
+            // 原因（真库实测，2026-09-30）：SqlSugar 按 IsAutoToUpper=true（默认）建出的表名是
+            // T_CLOUDL_DM_STRINGKEY（大写），而达梦在 CASE_SENSITIVE=1 下**带引号的标识符大小写敏感**：
+            //   - "T_CLOUDL_DM_STRINGKEY"（引号内字符全大写）刚好等于库里那张表 → 能删掉（不是"靠对"而是"靠巧"）；
+            //   - "t_cloudl_dm_stringkey"（引号内小写）与它不是同一个标识符 → `DROP TABLE IF EXISTS`
+            //     **静默不删**（实测残留表数仍为 1），残留表会让下面的断言读到上一次运行留下的结构。
+            // 不带引号时达梦按实例规则折叠成大写，与建表名一致，也与本文件其它查询
+            // （ALL_TAB_COLUMNS.TABLE_NAME = 'T_CLOUDL_DM_STRINGKEY'）的写法一致 —— 不再依赖"引号里恰好写对大小写"。
+            client.Ado.ExecuteCommand("DROP TABLE IF EXISTS T_CLOUDL_DM_STRINGKEY");
 
             client.CodeFirst.InitTables<DmStringKeyItem>();
             client.CodeFirst.InitTables<DmStringKeyItem>();
@@ -183,7 +277,8 @@ public class DmDatabaseTests
         }
         finally
         {
-            client.Ado.ExecuteCommand("DROP TABLE IF EXISTS \"T_CLOUDL_DM_STRINGKEY\"");
+            // 同上：不带引号，务必与建表时的标识符大小写归属一致，否则清不掉这张表。
+            client.Ado.ExecuteCommand("DROP TABLE IF EXISTS T_CLOUDL_DM_STRINGKEY");
         }
     }
 }

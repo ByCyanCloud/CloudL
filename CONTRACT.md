@@ -279,4 +279,12 @@ services.AddCloudLEntityFrameworkCore<AppDbContext>(options =>
 | 建表报「语法分析出错」/ 历史表都建不出来 | SqlSugar 把 `Length` **再拼一次** → `NVARCHAR2(256)(200)` | 框架写完整类型串时把 `Length` 归零 |
 | **第二次** `InitTables` 必崩（改可空报「无效的表约束」） | 主键列在数据字典里恒为 NOT NULL，模型侧若可空会生成 `modify ... null` | 主键列强制 `IsNullable = false` |
 | 表结构与实体对不齐、反复 ALTER | SqlSugar 默认 `varchar(36)` 与 EF 建出的 Guid 列类型不一致 | 按 provider 对齐：达梦 `CHAR(36)` / PostgreSQL `uuid` / SqlServer `uniqueidentifier` / MySql `char(36)` |
+| 作者写了 `[SugarColumn(ColumnDataType="NVARCHAR2(256)", Length=200)]` 仍报语法错 | 归零 `Length` 的规则此前只覆盖「框架自己写的类型串」，作者显式写的类型串漏网 | 规则改为按**类型串是否自带括号**统一判断（作者写法与框架写法一视同仁），迁移历史表实体也走这条规则 |
+| 版本号（脚本文件名）被截断成 256 | 历史表 `VERSION` 未声明 `Length`，只能吃默认的 `AppConstants.DefaultStringMaxLength` | `SchemaHistoryRow.Version` 显式 `Length = 512`（约定会把它拼进类型串，再把 `column.Length` 归零） |
+
+**验证覆盖（如实标注）**：达梦的**专有**行为（`NVARCHAR2(n)` 按字符计、`CHAR(36)` 主键列、`CASE_SENSITIVE` 下的标识符大小写、
+主键列恒 `NOT NULL`、迁移历史表能否在真库上建出来）**只有连上真库才能验证**。这些用例（`DmDatabaseTests`）
+**只在配置了环境变量 `CLOUDL_DM_CONNECTION` 时才会被验证**；未配置时它们在测试汇总里显示为 **Skipped**（不是静默通过），
+因此 **CI 上没有达梦实例 —— CI 的绿不代表达梦专有路径被验证过**。离线（SQLite）只能覆盖与 provider 无关的
+列约定（主键 / 可空性 / `[NotPersisted]` 忽略 / `Length` 归零后建表 SQL 不出现 `)(`）。
 

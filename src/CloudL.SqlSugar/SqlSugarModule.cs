@@ -80,16 +80,22 @@ public static class SqlSugarModule
 
                             if (property.PropertyType == typeof(string))
                             {
+                                // 长度：作者显式写了 Length 就以它为准（迁移历史表的 Version 需要 512 ——
+                                // 脚本文件名即版本号，长文件名不能被静默截断成默认的 256）；否则用框架默认常量。
+                                // 只认作者真正写下的 Length（判据同 HasExplicitNullability，看元数据），
+                                // 免得把 SqlSugar 的全局默认长度误当成作者意图。
+                                var stringLength = GetExplicitLength(property) ?? AppConstants.DefaultStringMaxLength;
+
                                 column.DataType = dbType switch
                                 {
-                                    global::SqlSugar.DbType.PostgreSQL => $"character varying({AppConstants.DefaultStringMaxLength})",
-                                    global::SqlSugar.DbType.SqlServer => $"nvarchar({AppConstants.DefaultStringMaxLength})",
+                                    global::SqlSugar.DbType.PostgreSQL => $"character varying({stringLength})",
+                                    global::SqlSugar.DbType.SqlServer => $"nvarchar({stringLength})",
                                     // 达梦的 VARCHAR(n) 按**字节**计（UTF-8 下一个汉字 3 字节）：256 只装得下
                                     // 85 个汉字；NVARCHAR2(n) 按**字符**计（实测 50 个汉字正好、51 个报超长），
                                     // 与 EF 侧 IsUnicode(true) 的意图一致。项目现有列就是 NVARCHAR2(n)。
-                                    global::SqlSugar.DbType.Dm => $"NVARCHAR2({AppConstants.DefaultStringMaxLength})",
-                                    global::SqlSugar.DbType.Oracle => $"VARCHAR2({AppConstants.DefaultStringMaxLength})",
-                                    global::SqlSugar.DbType.MySql => $"varchar({AppConstants.DefaultStringMaxLength})",
+                                    global::SqlSugar.DbType.Dm => $"NVARCHAR2({stringLength})",
+                                    global::SqlSugar.DbType.Oracle => $"VARCHAR2({stringLength})",
+                                    global::SqlSugar.DbType.MySql => $"varchar({stringLength})",
                                     _ => "TEXT"
                                 };
 
@@ -116,10 +122,20 @@ public static class SqlSugarModule
                                 // 上面赋的是**完整类型串**（自带括号）。SqlSugar 建表时会把 column.Length
                                 // 再拼一次 → 得到 "NVARCHAR2(256)(200)" 这种语法垃圾，达梦直接报
                                 // 「第 N 行附近出现错误: 语法分析出错」：迁移执行器连自己的历史表都建不出来
-                                // （SchemaHistoryRow.Version 的 Length=200 与约定叠加），方案 C 完全不可用。
+                                // （SchemaHistoryRow.Version 的 Length 与约定叠加），方案 C 完全不可用。
                                 // 归零即可 —— 长度已经写在类型串里了。
+                                // 迁移历史表实体走的正是这条路径（Version 未显式写 ColumnDataType），
+                                // 与下面作者显式写 ColumnDataType 的那条分支**同一条规则**。
                                 column.Length = 0;
                             }
+                        }
+                        else if (TypeStringCarriesItsOwnLength(explicitType))
+                        {
+                            // 同一条规则的作者版本：作者显式写下的完整类型串只要自带括号（如
+                            // [SugarColumn(ColumnDataType = "NVARCHAR2(256)", Length = 200)]），
+                            // 也必须把 Length 归零 —— 否则 SqlSugar 会拼成 NVARCHAR2(256)(200)，
+                            // 达梦报「语法分析出错」。此前这条只覆盖了框架自己写的类型串，作者的写法漏网。
+                            column.Length = 0;
                         }
 
                         // 可空性：显式设置 DataType 会丢掉它（曾把可空列建成 NOT NULL）；按 CLR 类型补回，与 EF 默认一致。
@@ -227,6 +243,51 @@ public static class SqlSugarModule
         }
 
         return services;
+    }
+
+    /// <summary>
+    /// 类型串是否<strong>自带长度</strong>（含括号，如 <c>NVARCHAR2(256)</c> / <c>CHAR(36)</c> /
+    /// <c>character varying(256)</c>）。
+    /// </summary>
+    /// <remarks>
+    /// <para>这是「类型串自带括号 ⇒ 把 <c>EntityColumnInfo.Length</c> 归零」这条规则的判据：
+    /// SqlSugar 建表时会把 <c>Length</c> 再拼一次，类型串里已经写了长度却不清零，
+    /// 就会生成 <c>NVARCHAR2(256)(200)</c> 这种语法垃圾（达梦报「语法分析出错」）。</para>
+    /// <para><strong>两种来源一视同仁</strong>：作者在 <c>[SugarColumn(ColumnDataType = ...)]</c> 里显式写下的
+    /// 类型串直接由本判据判定（此前漏网）；框架自己按 provider 写下的类型串则一律归零 ——
+    /// 框架写的字符串类型串全部自带括号（达梦 <c>NVARCHAR2(n)</c> 等），时间类型串不带括号、<c>Length</c>
+    /// 本来也不该带（保持框架原有行为不变）。迁移历史表实体走的正是框架这条路径。</para>
+    /// </remarks>
+    private static bool TypeStringCarriesItsOwnLength(string? dataType) =>
+        !string.IsNullOrWhiteSpace(dataType) && dataType.Contains('(');
+
+    /// <summary>
+    /// 作者显式写的 <c>SugarColumn.Length</c>（没写 / 写成非正数时返回 <c>null</c>）。
+    /// </summary>
+    /// <remarks>
+    /// 判据与 <see cref="HasExplicitNullability"/> 同源：看<strong>元数据</strong>
+    /// （<see cref="CustomAttributeData.NamedArguments"/> 只含作者真正写下的实参），
+    /// 而不是看 <c>EntityColumnInfo.Length</c> —— 后者会被 SqlSugar 的全局默认长度（或 0）干扰。
+    /// </remarks>
+    private static int? GetExplicitLength(PropertyInfo property)
+    {
+        foreach (var data in property.GetCustomAttributesData())
+        {
+            if (data.AttributeType != typeof(SugarColumn))
+                continue;
+
+            foreach (var argument in data.NamedArguments)
+            {
+                if (argument.MemberName == nameof(SugarColumn.Length)
+                    && argument.TypedValue.Value is int length
+                    && length > 0)
+                {
+                    return length;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
