@@ -109,7 +109,11 @@ dotnet nuget add source <框架仓库路径>/local-feed -n cloudl-local
 
 - `ConnectionStrings:Default` —— 数据库连接串；
 - `Jwt:SecretKey` —— **生产环境必须通过环境变量注入**（至少 32 字符），不要提交到仓库；
-- `Cors:AllowedOrigins` —— 前端来源白名单。
+- `Cors:AllowedOrigins` —— 前端来源白名单；
+- `Logging:RevealSensitiveDataInLogs` —— **⚠️ 生产环境建议显式改为 `false`**，否则日志会包含明文凭据
+  （`[Auth]` 头、`[Body]` 请求体与 query 里的口令/令牌/密钥都会按原文落盘）。模板里显式写成 `true`，与框架默认值一致：
+  框架的语义是 **`true` = 明文显示（默认）**、`false` = 脱敏；开关开启时应用启动会打印一条一次性警告。
+  不想改文件时可用环境变量覆盖：`Logging__RevealSensitiveDataInLogs=false`。
 
 配置缺失或非法时应用会在**启动阶段**直接报错（`ValidateOnStart`），不会拖到第一次请求才失败。
 

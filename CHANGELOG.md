@@ -9,6 +9,20 @@
   标题（`请求参数验证失败`）与级别（Warning）不变；两条防护不变（最多列 30 个字段并标注 `…（共 N 项）`、
   总长超 1000 字符截断）；**响应结构不变**（统一 `ApiResponse`、snake_case 错误键、`error_id`，且日志里的 `errorId`
   与响应里的 `error_id` 是同一个值）。异常中间件自身未改动，其日志渲染结果**逐字节不变**。
+- **新增日志敏感信息开关 `Logging:RevealSensitiveDataInLogs`（默认 `true` = 明文显示）**：
+  `true` 时 `[Auth]` 请求头、`[Body]` 请求体与请求日志摘要里的 query **按原文记录**（不再出现 `***`）；
+  设为 `false` 恢复原有的两层脱敏（`Bearer ***XXXXXX`、敏感键 `***`）。该键复用标准日志节 `Logging`
+  （`LogLevel` 不受影响）；想看"到底记了什么"的开发/联调期不用改代码，生产环境请显式设为 `false`。
+- **开关打开时的启动横幅警告**：`true` 时应用启动后输出**一条且仅一条** Warning
+  （`⚠️ 日志明文模式已开启…生产环境请改为 false。`），写在 `ApplicationStarted` 回调里，
+  **不会每请求刷屏**；`false` 时不输出。
+- 开关以**显式依赖**落到各调用点（新增 `ISensitiveDataLogPolicy` / `SensitiveDataLogPolicy`，`AddCloudLAspNetCore` 注册；
+  用 `IOptions<T>` 而非 `IOptionsMonitor`：启动期定型、装配阶段解析一次即可安全捕获），
+  没有引入可变的全局静态字段；`SensitiveDataRedactor` 仍是无状态的脱敏纯函数（`false` 时才被调用）。
+  `ValidationFilter` / `ExceptionHandlingMiddleware` 的旧公开构造**保留**（二进制兼容），
+  新增构造标注 `[ActivatorUtilitiesConstructor]` 供 DI 选用（否则 MVC / `UseMiddleware` 会因多个公开构造而歧义）。
+- **空值 `(none)` 语义不变**：空请求体与缺失的 Authorization 头在两种模式下都渲染为 `(none)`
+  （`SensitiveDataRedactor.NonePlaceholder`，两条路径共用）。
 
 ### 修复
 
@@ -22,7 +36,13 @@
 
 ### 迁移影响
 
-- **需要业务侧新增 EF 迁移：否。破坏性变更：否**（仅日志格式变化）。
+- **需要业务侧新增 EF 迁移：否。破坏性变更：否**（仅日志内容变化）。
+- ⚠️ **这是默认行为变更：升级后日志会包含明文凭据**（`[Auth]` 头、`[Body]` 请求体、请求日志 query 里的
+  口令/令牌/密钥按原文落盘），因为 `Logging:RevealSensitiveDataInLogs` 的默认值就是 `true`。
+  **生产环境请显式设为 `false`**（`appsettings.json` 里的 `Logging:RevealSensitiveDataInLogs`，
+  或环境变量 `Logging__RevealSensitiveDataInLogs=false`）；不设置即沿用明文，启动日志里会有一条 `⚠️` 警告提醒。
+- 若你曾直接 `new ValidationFilter(logger)` / `new ExceptionHandlingMiddleware(next, logger, env)`，
+  旧构造仍然可用（行为 = 默认明文）；通过 DI 激活的路径会自动拿到按配置构造的策略，无需改业务代码。
 
 ## [0.7.4] - 2026-09-30
 

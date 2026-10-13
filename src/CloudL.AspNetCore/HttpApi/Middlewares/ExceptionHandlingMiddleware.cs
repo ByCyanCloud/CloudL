@@ -5,6 +5,7 @@ using CloudL.AspNetCore.Logging;
 using CloudL.Domain.Shared.Constants;
 using CloudL.Domain.Shared.Exceptions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -15,26 +16,48 @@ namespace CloudL.AspNetCore.HttpApi.Middlewares;
 /// <para><strong>安全约定</strong>：只有框架定义的业务异常才把消息透传给调用方；
 /// 其余异常（含 BCL 的 <c>ArgumentException</c>/<c>InvalidOperationException</c>/<c>KeyNotFoundException</c>）
 /// 一律返回通用消息 —— 它们几乎都是代码缺陷而不是调用方输入问题。</para>
-/// <para>请求体与 Authorization 头在写日志前一律脱敏；堆栈仅在开发环境、且仅对 5xx 返回。</para>
+/// <para>请求体与 Authorization 头写日志前交给 <see cref="ISensitiveDataLogPolicy"/>：默认明文
+/// （<c>Logging:RevealSensitiveDataInLogs</c> 为 <c>true</c>），显式设为 <c>false</c> 时脱敏；堆栈仅在开发环境、且仅对 5xx 返回。</para>
 /// </summary>
 public class ExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
     private readonly IHostEnvironment _environment;
+    private readonly ISensitiveDataLogPolicy _sensitiveDataLogPolicy;
 
+    /// <summary>
+    /// 为<strong>二进制兼容</strong>保留的旧构造：使用框架默认策略
+    /// （明文，与 <c>Logging:RevealSensitiveDataInLogs</c> 不配置时的默认值一致）。
+    /// </summary>
     public ExceptionHandlingMiddleware(
         RequestDelegate next,
         ILogger<ExceptionHandlingMiddleware> logger,
         IHostEnvironment environment)
+        : this(next, logger, environment, SensitiveDataLogPolicy.Default)
+    {
+    }
+
+    /// <summary>
+    /// DI 激活（<c>UseMiddleware&lt;T&gt;()</c>）使用的构造。<see cref="ActivatorUtilitiesConstructorAttribute"/>
+    /// 用来在"保留旧构造"的前提下明确指定它，避免多个公开构造带来的歧义。
+    /// </summary>
+    [ActivatorUtilitiesConstructor]
+    public ExceptionHandlingMiddleware(
+        RequestDelegate next,
+        ILogger<ExceptionHandlingMiddleware> logger,
+        IHostEnvironment environment,
+        ISensitiveDataLogPolicy sensitiveDataLogPolicy)
     {
         ArgumentNullException.ThrowIfNull(next);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(sensitiveDataLogPolicy);
 
         _next = next;
         _logger = logger;
         _environment = environment;
+        _sensitiveDataLogPolicy = sensitiveDataLogPolicy;
     }
 
     /// <summary>处理请求。</summary>
@@ -79,7 +102,7 @@ public class ExceptionHandlingMiddleware
             return;
         }
 
-        var requestBody = SensitiveDataRedactor.RedactBody(
+        var requestBody = _sensitiveDataLogPolicy.FormatBody(
             await context.Request.ReadBodyAsync().ConfigureAwait(false));
 
         context.Response.ContentType = "application/json; charset=utf-8";
@@ -96,7 +119,7 @@ public class ExceptionHandlingMiddleware
         string requestBody,
         HttpStatusCode statusCode)
     {
-        var authHeader = SensitiveDataRedactor.RedactAuthorizationHeader(
+        var authHeader = _sensitiveDataLogPolicy.FormatAuthorizationHeader(
             context.Request.Headers.Authorization.ToString());
 
         // 日志级别直接由映射出的状态码决定：5xx 是服务端问题（Error），4xx 是预期内的业务问题（Warning）。

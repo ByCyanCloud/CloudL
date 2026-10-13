@@ -1,6 +1,7 @@
 using CloudL.AspNetCore.Logging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Events;
 
@@ -51,16 +52,22 @@ public static class ApplicationBuilderExtensions
 
     /// <summary>
     /// 启用请求日志：每个请求输出一条结构化摘要
-    /// （方法、路径、脱敏后的 query、状态码、耗时、TraceId、客户端 IP、用户名）。
+    /// （方法、路径、经 <see cref="ISensitiveDataLogPolicy"/> 处理的 query、状态码、耗时、TraceId、客户端 IP、用户名）。
     /// </summary>
     /// <remarks>
     /// <para>请在 <c>ExceptionHandlingMiddleware</c> <strong>之前</strong>调用：异常中间件会写出统一错误响应、
     /// 状态码此时已定型，请求日志因此能记录到最终状态码；同时避免与异常中间件的详细异常日志重复。</para>
-    /// <para>query string 中的敏感参数（如 <c>access_token</c>）会被自动遮蔽 —— 否则令牌会随日志落盘。</para>
+    /// <para>query string 里的敏感参数（如 <c>access_token</c>）默认<strong>按原文记录</strong>；
+    /// 把 <c>Logging:RevealSensitiveDataInLogs</c> 设为 <c>false</c> 即可恢复遮蔽
+    /// （否则令牌会随日志落盘）。</para>
+    /// <para>策略在<strong>装配阶段</strong>从根容器解析一次并捕获：它是启动期定型的只读单例
+    /// （见 <see cref="SensitiveDataLogPolicy"/>），因此不必每个请求再去 DI 里取。</para>
     /// </remarks>
     public static IApplicationBuilder UseCloudLRequestLogging(this IApplicationBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
+
+        var sensitiveDataLogPolicy = app.ApplicationServices.GetRequiredService<ISensitiveDataLogPolicy>();
 
         return app.UseSerilogRequestLogging(options =>
         {
@@ -74,7 +81,7 @@ public static class ApplicationBuilderExtensions
                 diagnosticContext.Set("TraceId", httpContext.TraceIdentifier);
                 diagnosticContext.Set(
                     "RedactedQuery",
-                    SensitiveDataRedactor.RedactQueryString(httpContext.Request.QueryString.Value));
+                    sensitiveDataLogPolicy.FormatQueryString(httpContext.Request.QueryString.Value));
 
                 var clientIp = httpContext.Connection.RemoteIpAddress?.ToString();
                 if (!string.IsNullOrEmpty(clientIp))

@@ -66,6 +66,13 @@ public static class ServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // 日志敏感信息开关：Logging:RevealSensitiveDataInLogs，默认 true（明文）。
+        // 只用 IOptions（启动期定型）—— 装配阶段（如 UseCloudLRequestLogging）会解析一次并捕获这个单例。
+        services.AddOptions<SensitiveDataLoggingOptions>()
+            .Bind(configuration.GetSection(SensitiveDataLoggingOptions.SectionName));
+
+        services.TryAddSingleton<ISensitiveDataLogPolicy, SensitiveDataLogPolicy>();
+
         services.TryAddSingleton(TimeProvider.System);
         services.AddHttpContextAccessor();
 
@@ -355,7 +362,11 @@ public static class ServiceCollectionExtensions
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger("CloudL.JwtBearer");
 
-        var authHeader = SensitiveDataRedactor.RedactAuthorizationHeader(
+        // JWT 事件回调不是 DI 激活的，因此从当前请求的容器里取策略（显式依赖，不读静态全局状态）。
+        var sensitiveDataLogPolicy = httpContext.RequestServices
+            .GetRequiredService<ISensitiveDataLogPolicy>();
+
+        var authHeader = sensitiveDataLogPolicy.FormatAuthorizationHeader(
             httpContext.Request.Headers.Authorization.ToString());
 
         logger.LogWarning(

@@ -30,12 +30,13 @@
 | 持久化 | `IRepository<TEntity, TKey>` / `IUnitOfWork` / `PagedResult<T>` / 4 个实体配置基类 / `FrameworkDbContext`（仅继承） |
 | 应用层 | `CloudL.Application.Contracts.*`（分页 DTO、服务接口）/ Mapster 全局约定 |
 | Web 层 | `BaseApiController` / `ApiResponse` / `ApiResponse<T>` / `ValidationFilter`（在 `Program.cs` 注册） |
-| 配置 | `JwtOptions` / `CorsOptions` / `PasswordHasherOptions` / `RateLimitOptions` / `LoginProtectionOptions` / `HttpClients` |
+| 配置 | `JwtOptions` / `CorsOptions` / `PasswordHasherOptions` / `RateLimitOptions` / `LoginProtectionOptions` / `SensitiveDataLoggingOptions` / `HttpClients` |
 | 装配入口 | `AddCloudLAspNetCore()` / `AddCloudLEntityFrameworkCore<TContext>()` / `UseCloudL*()` 系列 / `UseCloudLPostgreSql()` 或 `UseCloudLSqlServer()` |
 
 **以下属于实现，请通过上表的接口替换，而不是直接依赖**：
 `EfCoreRepository<,>`、`EfCoreUnitOfWork`、`Pbkdf2PasswordHasher`、`JwtTokenService`、`InMemoryRefreshTokenStore`、
-`InMemoryLoginAttemptGuard`、`HttpClientService`、`CurrentUser`、`SensitiveDataRedactor`、`DomainEventDispatcher`。
+`InMemoryLoginAttemptGuard`、`HttpClientService`、`CurrentUser`、`SensitiveDataRedactor`、`DomainEventDispatcher`、
+`SensitiveDataLogPolicy`（替换请注册自定义 `ISensitiveDataLogPolicy`）。
 
 ---
 
@@ -74,6 +75,7 @@
 | `HttpClients:<名称>:{BaseUrl,TimeoutSeconds,ForwardAuthorization}` | | 具名 HTTP 客户端 |
 | `RateLimits:Auth:{PermitLimit,WindowSeconds,QueueLimit}` | | 10 / 60 / 0（认证接口按 IP 限流） |
 | `LoginProtection:{MaxFailures,FailureWindowSeconds,LockoutSeconds,MaxTrackedAccounts,CleanupIntervalSeconds}` | | 5 / 300 / 60 / 200000 / 30（账号维度锁定） |
+| `Logging:RevealSensitiveDataInLogs` | | **默认 `true` = 日志明文显示敏感信息**（`[Auth]` 头、`[Body]` 请求体、请求日志 query 均按原文记录）；设为 `false` 恢复脱敏（`Bearer ***XXXXXX`、敏感键 `***`）。不改配置就是明文 —— 生产环境请显式设为 `false` |
 
 **改了会怎样**：`ValidateOnStart` 会在**启动阶段**以明确路径报错 —— 响亮失败，但仍然是破坏性变更，只在 major 做。
 
@@ -93,7 +95,7 @@
 | 分页 | 参数 `pageIndex` / `pageSize` / `sortBy` / `sortDirection`；`pageSize` 上限 100；排序自动追加主键次级键（保证翻页稳定） |
 | 限流 | 429 + `Retry-After`；IP 维度（IPv6 按 `/64` 聚合）+ 账号维度（锁定返回 429/4291） |
 | 领域事件 | `SaveChanges` **提交后**分发；事务内则**事务提交后**统一分发，回滚不分发 |
-| **日志** | 块状日志的**空行由输出模板的 `{NewLine}` 产生**（放在模板最前），**消息内不夹换行** —— 否则换行会落在 Serilog 的 `[级别]` 前缀之后，前缀会独占一行；请求日志摘要中的敏感 query 参数已脱敏；请求体在 multipart/超大/分块时**不缓冲** |
+| **日志** | 块状日志的**空行由输出模板的 `{NewLine}` 产生**（放在模板最前），**消息内不夹换行** —— 否则换行会落在 Serilog 的 `[级别]` 前缀之后，前缀会独占一行；请求日志摘要中的 query 与块状日志的 `[Auth]`/`[Body]` **默认明文**（`Logging:RevealSensitiveDataInLogs` 默认 `true`，可显式设为 `false` 走脱敏），开关开启时启动阶段输出一条且仅一条 `⚠️` 警告；请求体在 multipart/超大/分块时**不缓冲** |
 | 健康检查 | `/health` **匿名可访问**（有自动化守卫） |
 
 ---
@@ -132,7 +134,7 @@
 
 - 🔒 数据库约定与配置键 → 只在 major 动，且必须写迁移说明；
 - ⛔ 公开类型/成员/接口 → 由 ApiCompat 拦，破了就要在抑制文件里登记**理由**；
-- 行为契约 → 先改框架测试（182 个用例）再改实现，让测试替你通知用户；
+- 行为契约 → 先改框架测试（202 个用例：198 通过 + 4 个达梦用例需 `CLOUDL_DM_CONNECTION` 才跑）再改实现，让测试替你通知用户；
 - 模板生成的文件 → 改动要能被第 4 步的比对脚本发现（保持文件路径稳定，别随意重命名）；
 - 框架与模板**共同引用**的第三方包（如 `Serilog.AspNetCore`）→ 两边必须同步升级。
 

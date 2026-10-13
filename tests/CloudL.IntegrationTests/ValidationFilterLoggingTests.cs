@@ -88,7 +88,12 @@ public class ValidationFilterLoggingTests
     public async Task InvalidModelState_ShouldRedactBodyAndAuthLikeExceptionMiddleware()
     {
         var capture = new CapturingLoggerProvider();
-        await using var host = await CloudLTestHost.StartAsync(loggerProvider: capture);
+
+        // 脱敏是"显式关掉开关"后的行为：Logging:RevealSensitiveDataInLogs 默认 true（明文），
+        // 这条用例钉的是 false 那一档（开关的默认档由 SensitiveDataLoggingSwitchTests 覆盖）。
+        await using var host = await CloudLTestHost.StartAsync(
+            new Dictionary<string, string?> { ["Logging:RevealSensitiveDataInLogs"] = "false" },
+            capture);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/validated-query/body")
         {

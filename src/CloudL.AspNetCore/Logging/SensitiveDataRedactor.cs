@@ -7,7 +7,11 @@ using System.Text.RegularExpressions;
 namespace CloudL.AspNetCore.Logging;
 
 /// <summary>
-/// 日志脱敏工具。
+/// 日志脱敏工具（纯函数，本身<strong>没有</strong>开关状态）。
+/// <para><strong>是否调用它由配置决定</strong>：<c>Logging:RevealSensitiveDataInLogs</c> 为 <c>true</c>（默认）时，
+/// 调用点会走 <see cref="SensitiveDataLogPolicy"/> 的明文路径、<strong>不</strong>调用本类；
+/// 为 <c>false</c> 时本类负责遮蔽。因此"要不要脱敏"的决策只有一个地方（策略/配置），
+/// 本类只提供"怎么脱敏"。</para>
 /// 采用<strong>两层</strong>策略，避免"改了个字段名就漏"的问题：
 /// <list type="number">
 ///   <item>按键名遮蔽：<c>password</c>、<c>refreshToken</c>、<c>client_secret</c>、<c>access_token</c> 等常见敏感字段
@@ -20,7 +24,14 @@ namespace CloudL.AspNetCore.Logging;
 public static class SensitiveDataRedactor
 {
     private const string Mask = "***";
-    private const int MaxBodyLength = 4096;
+
+    /// <summary>
+    /// 请求体的日志长度上限。脱敏与明文（<c>Logging:RevealSensitiveDataInLogs=true</c>）两条路径共用。
+    /// </summary>
+    internal const int MaxBodyLength = 4096;
+
+    /// <summary>超过长度上限时追加在末尾的标注。两条路径共用同一写法，避免"同一个意思两种标注"。</summary>
+    internal const string TruncationMarker = "...(已截断)";
 
     /// <summary>
     /// 空值占位符：视为"没有值"的日志片段统一写成它，而不是空串。
@@ -31,8 +42,10 @@ public static class SensitiveDataRedactor
     /// </summary>
     public const string NonePlaceholder = "(none)";
 
-    /// <summary>query 串的日志长度上限（请求体有上限，query 串同样需要）。</summary>
-    private const int MaxQueryStringLength = 1024;
+    /// <summary>
+    /// query 串的日志长度上限（请求体有上限，query 串同样需要）。脱敏与明文两条路径共用。
+    /// </summary>
+    internal const int MaxQueryStringLength = 1024;
 
     /// <summary>按名遮蔽的字段名（大小写不敏感；比较前会去掉下划线与连字符）。</summary>
     private static readonly HashSet<string> SensitiveKeys = new(StringComparer.OrdinalIgnoreCase)
@@ -118,7 +131,7 @@ public static class SensitiveDataRedactor
             return string.Empty;
 
         var redacted = hasPrefix ? "?" + result : result;
-        return truncated ? redacted + "...(已截断)" : redacted;
+        return truncated ? redacted + TruncationMarker : redacted;
     }
 
     /// <summary>
@@ -152,7 +165,7 @@ public static class SensitiveDataRedactor
             RedactNode(node);
 
             var redacted = node.ToJsonString(RedactedJsonOptions);
-            return truncated ? redacted + "...(已截断)" : redacted;
+            return truncated ? redacted + TruncationMarker : redacted;
         }
         catch (JsonException)
         {

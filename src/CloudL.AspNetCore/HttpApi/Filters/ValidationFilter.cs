@@ -6,13 +6,15 @@ using CloudL.Domain.Shared.Constants;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace CloudL.AspNetCore.HttpApi.Filters;
 
 /// <summary>
 /// 模型验证过滤器：统一校验 ModelState，错误键名转为 snake_case，返回统一 <see cref="ApiResponse{T}"/>。
-/// 记录请求体前会做脱敏，避免口令等敏感信息落入日志。
+/// 记录请求体/Authorization 头时由 <see cref="ISensitiveDataLogPolicy"/> 决定明文还是脱敏
+/// （配置 <c>Logging:RevealSensitiveDataInLogs</c>，默认明文）。
 /// </summary>
 public class ValidationFilter : IAsyncActionFilter
 {
@@ -23,11 +25,30 @@ public class ValidationFilter : IAsyncActionFilter
     private const int MaxLoggedErrorsLength = 1000;
 
     private readonly ILogger<ValidationFilter> _logger;
+    private readonly ISensitiveDataLogPolicy _sensitiveDataLogPolicy;
 
+    /// <summary>
+    /// 为<strong>二进制兼容</strong>保留的旧构造：使用框架默认策略
+    /// （明文，与 <c>Logging:RevealSensitiveDataInLogs</c> 不配置时的默认值一致）。
+    /// </summary>
     public ValidationFilter(ILogger<ValidationFilter> logger)
+        : this(logger, SensitiveDataLogPolicy.Default)
+    {
+    }
+
+    /// <summary>
+    /// DI 激活使用的构造。<see cref="ActivatorUtilitiesConstructorAttribute"/> 用来在"保留旧构造"的前提下
+    /// 明确告诉 <c>ActivatorUtilities</c>（MVC 的 <c>options.Filters.Add&lt;T&gt;()</c> 就走它）该选哪个构造 ——
+    /// 否则多个公开构造会让它抛 <c>MultipleCtorsFound</c>。
+    /// </summary>
+    [ActivatorUtilitiesConstructor]
+    public ValidationFilter(ILogger<ValidationFilter> logger, ISensitiveDataLogPolicy sensitiveDataLogPolicy)
     {
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(sensitiveDataLogPolicy);
+
         _logger = logger;
+        _sensitiveDataLogPolicy = sensitiveDataLogPolicy;
     }
 
     /// <inheritdoc />
@@ -57,12 +78,12 @@ public class ValidationFilter : IAsyncActionFilter
             "请求参数验证失败",
             errors: errors);
 
-        var requestBody = SensitiveDataRedactor.RedactBody(
+        var requestBody = _sensitiveDataLogPolicy.FormatBody(
             await context.HttpContext.Request.ReadBodyAsync().ConfigureAwait(false));
 
-        // 与 ExceptionHandlingMiddleware 的块状日志保持同一结构：同样的标签、同样的顺序、同样的脱敏实现。
+        // 与 ExceptionHandlingMiddleware 的块状日志保持同一结构：同样的标签、同样的顺序、同样的敏感数据策略。
         // errors 本身就是统一响应体的一部分，因此并入 [Response] 那一行，而不是独占一段。
-        var authHeader = SensitiveDataRedactor.RedactAuthorizationHeader(
+        var authHeader = _sensitiveDataLogPolicy.FormatAuthorizationHeader(
             context.HttpContext.Request.Headers.Authorization.ToString());
 
         // 注意：消息字符串内不得以换行开头/结尾 —— 块状日志的空行由 Serilog 输出模板最前面的 {NewLine} 产生。
