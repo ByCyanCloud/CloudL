@@ -41,7 +41,7 @@ public class ValidationFilterLoggingTests
     }
 
     [Fact]
-    public async Task TooManyFailedFields_ShouldLogFirstTenAndTotalCount()
+    public async Task ManyFailedFields_ShouldLogAllWhenUnderCap()
     {
         var capture = new CapturingLoggerProvider();
         await using var host = await CloudLTestHost.StartAsync(loggerProvider: capture);
@@ -52,9 +52,10 @@ public class ValidationFilterLoggingTests
 
         var log = Assert.Single(CaptureValidationFailure(capture));
 
-        // 最多列 10 个字段，超出时标注总项数。
-        Assert.Equal(10, CountOccurrences(log, "字段必填"));
-        Assert.Contains("…（共 12 项）", log, StringComparison.Ordinal);
+        // 最多列 30 个字段，超出时标注总项数。
+        Assert.Equal(12, CountOccurrences(log, "字段必填"));
+        // 上限是 30，12 个字段不会触发截断标注
+        Assert.DoesNotContain("…（共", log, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -142,7 +143,7 @@ public sealed class ValidatedQueryDto
     public int PageSize { get; set; }
 }
 
-/// <summary>12 个必填字段：用于验证"最多列 10 个 + 标注总项数"。</summary>
+/// <summary>12 个必填字段：用于验证"最多列 30 个 + 标注总项数"。</summary>
 public sealed class ManyFieldsDto
 {
     [Required(ErrorMessage = "字段必填")]

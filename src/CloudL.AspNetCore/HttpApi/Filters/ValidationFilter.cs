@@ -17,7 +17,7 @@ namespace CloudL.AspNetCore.HttpApi.Filters;
 public class ValidationFilter : IAsyncActionFilter
 {
     /// <summary>日志里最多列出的失败字段数：只用于日志，响应里的错误项一个不少。</summary>
-    private const int MaxLoggedErrorFields = 10;
+    private const int MaxLoggedErrorFields = 30;
 
     /// <summary>日志里失败字段明细的长度上限（字符）：超出即截断并标注，避免单条日志被灌爆。</summary>
     private const int MaxLoggedErrorsLength = 1000;
