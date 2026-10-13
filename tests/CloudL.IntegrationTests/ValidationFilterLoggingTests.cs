@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace CloudL.IntegrationTests;
 
@@ -24,6 +25,19 @@ public class ValidationFilterLoggingTests
 {
     private const string LogTitle = "请求参数验证失败";
 
+    /// <summary>异常中间件里"业务异常"（4xx）那条日志的标题。</summary>
+    private const string BusinessExceptionLogTitle = "业务异常";
+
+    /// <summary>
+    /// 空请求体 / 缺失 Authorization 头在日志里的占位符。
+    /// <para>字面量而不是引用常量：这里钉的是<strong>实际写进日志的字符串</strong>，改用常量会让断言变成自证。</para>
+    /// </summary>
+    private const string NonePlaceholder = "(none)";
+
+    private readonly ITestOutputHelper _output;
+
+    public ValidationFilterLoggingTests(ITestOutputHelper output) => _output = output;
+
     [Fact]
     public async Task InvalidModelState_ShouldLogBlockShapedLikeBusinessException()
     {
@@ -41,6 +55,7 @@ public class ValidationFilterLoggingTests
         Assert.StartsWith(LogTitle, log, StringComparison.Ordinal);
         Assert.Equal(LogLevel.Warning, entry.Level);
         Assert.False(log.StartsWith('\n'), "消息不得以换行开头");
+        Assert.False(log.EndsWith('\n'), "消息不得以换行结尾（本请求无 body，[Body] 段曾被渲染成空串）：" + log);
         Assert.DoesNotContain("\n\n", log, StringComparison.Ordinal);
 
         // 旧结构必须消失：ErrorId 独占一行、errors 独占一段
@@ -102,6 +117,50 @@ public class ValidationFilterLoggingTests
 
         // 字段错误与请求体同框，且 errors 落在 [Response] 行
         Assert.Contains("organization_code: 机构编号不能为空", GetResponseLine(log), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 空请求体（无 body 的 GET）：<c>[Body]</c> 段必须渲染成非空占位符，否则整条块状日志<strong>以换行结尾</strong>。
+    /// <para>这是此前遗留的缺口：只钉了"不以换行开头"，没钉"不以换行结尾"，于是空 body 一路漏过去。
+    /// 同时钉死两条路径（<see cref="CloudL.AspNetCore.HttpApi.Filters.ValidationFilter"/> 与
+    /// <c>ExceptionHandlingMiddleware</c>）除了标题与业务字段外<strong>逐字节一致</strong>。</para>
+    /// </summary>
+    [Fact]
+    public async Task EmptyBody_ShouldRenderNonePlaceholderAndNeverEndWithNewLine_OnBothPaths()
+    {
+        var capture = new CapturingLoggerProvider();
+        await using var host = await CloudLTestHost.StartAsync(loggerProvider: capture);
+
+        // 两条路径都用"不带 body 的 GET" —— 没有请求体正是这条缺陷的触发条件。
+        var validationResponse = await host.Client.GetAsync("/api/validated-query?pageIndex=0&pageSize=0");
+        var exceptionResponse = await host.Client.GetAsync("/api/diagnostic/missing");
+
+        Assert.Equal(HttpStatusCode.BadRequest, validationResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, exceptionResponse.StatusCode);
+
+        var validationLog = Assert.Single(CaptureValidationFailures(capture)).Message;
+        var exceptionLog = Assert.Single(CaptureBusinessExceptions(capture)).Message;
+
+        _output.WriteLine("路径一（ValidationFilter）：\n" + validationLog);
+        _output.WriteLine("路径二（ExceptionHandlingMiddleware）：\n" + exceptionLog);
+
+        // 1) 两条路径都不得以换行开头 / 结尾（空请求体这一情形必须被覆盖）
+        Assert.False(validationLog.StartsWith('\n'), "验证失败日志不得以换行开头：" + validationLog);
+        Assert.False(validationLog.EndsWith('\n'), "验证失败日志不得以换行结尾（空 body 被渲染成了空串）：" + validationLog);
+        Assert.False(exceptionLog.StartsWith('\n'), "业务异常日志不得以换行开头：" + exceptionLog);
+        Assert.False(exceptionLog.EndsWith('\n'), "业务异常日志不得以换行结尾（空 body 被渲染成了空串）：" + exceptionLog);
+        Assert.DoesNotContain("\n\n", validationLog, StringComparison.Ordinal);
+        Assert.DoesNotContain("\n\n", exceptionLog, StringComparison.Ordinal);
+
+        // 2) [Body] 段是同一个非空占位符，而不是空串
+        Assert.Equal(NonePlaceholder, GetBlockSection(validationLog, "[Body]"));
+        Assert.Equal(NonePlaceholder, GetBlockSection(exceptionLog, "[Body]"));
+
+        // 3) 逐字节比对：抹掉"随请求而变"的部分（标题、[Response] 行、[Request] 行）之后，
+        //    两条路径必须完全相同 —— [Auth] 与 [Body] 段用的脱敏与占位符也必须是同一套。
+        Assert.Equal(
+            NormalizeBlockForComparison(exceptionLog),
+            NormalizeBlockForComparison(validationLog));
     }
 
     [Fact]
@@ -178,6 +237,51 @@ public class ValidationFilterLoggingTests
         capture.Entries
             .Where(entry => entry.Message.Contains(LogTitle, StringComparison.Ordinal))
             .ToArray();
+
+    /// <summary>只挑出异常中间件写的"业务异常"那条日志（4xx 分支）。</summary>
+    private static CapturedLog[] CaptureBusinessExceptions(CapturingLoggerProvider capture) =>
+        capture.Entries
+            .Where(entry => entry.Message.StartsWith(BusinessExceptionLogTitle, StringComparison.Ordinal))
+            .ToArray();
+
+    /// <summary>
+    /// 取出某个段标签之后的全部内容（不含标签本身，也不含紧随标签的换行），
+    /// 用于比对两条路径的同名段是否<strong>逐字节</strong>相同。
+    /// </summary>
+    private static string GetBlockSection(string log, string tag)
+    {
+        var start = IndexOf(log, tag) + tag.Length;
+
+        // 段内容到下一个段标签（"\n[" 起头）或消息末尾为止
+        var next = log.IndexOf("\n[", start, StringComparison.Ordinal);
+        var end = next >= 0 ? next : log.Length;
+
+        return log[start..end].TrimStart('\n');
+    }
+
+    /// <summary>
+    /// 把块状日志里"随请求而变"的部分抹成占位符：标题行、<c>[Response]</c> 行的载荷、<c>[Request]</c> 行的载荷。
+    /// 剩下的标签、顺序、以及 <c>[Auth]</c>/<c>[Body]</c> 段的实际内容必须两条路径逐字节相同。
+    /// </summary>
+    private static string NormalizeBlockForComparison(string log)
+    {
+        var lines = log.Split('\n');
+
+        // 第 0 行是标题（"请求参数验证失败" vs "业务异常"），本来就该不同
+        lines[0] = "<title>";
+
+        for (var index = 1; index < lines.Length - 1; index++)
+        {
+            if (lines[index] is "[Response]" or "[Request]")
+            {
+                // 这两行的载荷是业务字段（状态码/errorId/message/路径），允许不同
+                lines[index + 1] = "<payload>";
+                index++;
+            }
+        }
+
+        return string.Join('\n', lines);
+    }
 
     /// <summary>取出块状日志里 <c>[Response]</c> 的下一行 —— 失败明细必须和 statusCode/errorId 同行。</summary>
     private static string GetResponseLine(string log)

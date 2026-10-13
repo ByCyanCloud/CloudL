@@ -126,10 +126,14 @@ public class SensitiveDataRedactorTests
     }
 
     [Fact]
-    public void RedactBody_ShouldReturnEmpty_ForEmptyInput()
+    public void RedactBody_ShouldReturnNonePlaceholder_ForEmptyInput()
     {
-        Assert.Equal(string.Empty, SensitiveDataRedactor.RedactBody(null));
-        Assert.Equal(string.Empty, SensitiveDataRedactor.RedactBody("   "));
+        // 字面量而不是常量：钉住实际写进日志的字符串。
+        // 不能是空串 —— 空串会让 [Body] 段把整条块状日志变成"以换行结尾"（见 CONTRACT.md 的日志约定）；
+        // 写法沿用既有的空 Authorization 头约定（缺失即 "(none)"）。
+        Assert.Equal("(none)", SensitiveDataRedactor.RedactBody(null));
+        Assert.Equal("(none)", SensitiveDataRedactor.RedactBody("   "));
+        Assert.Equal(SensitiveDataRedactor.NonePlaceholder, SensitiveDataRedactor.RedactBody(null));
     }
 
     [Fact]

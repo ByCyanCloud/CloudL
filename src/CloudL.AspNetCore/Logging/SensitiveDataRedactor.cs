@@ -22,6 +22,15 @@ public static class SensitiveDataRedactor
     private const string Mask = "***";
     private const int MaxBodyLength = 4096;
 
+    /// <summary>
+    /// 空值占位符：视为"没有值"的日志片段统一写成它，而不是空串。
+    /// <para><strong>为什么不能返回空串</strong>：<c>[Auth]</c> 与 <c>[Body]</c> 是块状日志里独立成段的最后两段，
+    /// 渲染成空串会得到 <c>[Body]\n</c> —— 整条消息以换行结尾（相邻两段都空时还会多出一个空行），
+    /// 与契约「空行由输出模板的 <c>{NewLine}</c> 产生、消息内不夹换行」冲突。
+    /// 缺失的 Authorization 头一直是这个写法，空请求体现与它保持一致，且两条写日志的路径共用本常量以免再次漂移。</para>
+    /// </summary>
+    public const string NonePlaceholder = "(none)";
+
     /// <summary>query 串的日志长度上限（请求体有上限，query 串同样需要）。</summary>
     private const int MaxQueryStringLength = 1024;
 
@@ -115,11 +124,12 @@ public static class SensitiveDataRedactor
     /// <summary>
     /// 脱敏请求体。
     /// JSON 体会递归处理；非 JSON 体整体省略（只保留长度），避免误记敏感内容。
+    /// 空体（含只有空白）返回 <see cref="NonePlaceholder"/> 而不是空串，理由见该常量。
     /// </summary>
     public static string RedactBody(string? body)
     {
         if (string.IsNullOrWhiteSpace(body))
-            return string.Empty;
+            return NonePlaceholder;
 
         var trimmed = body.Trim();
         var truncated = false;
@@ -155,7 +165,7 @@ public static class SensitiveDataRedactor
     public static string RedactAuthorizationHeader(string? header)
     {
         if (string.IsNullOrWhiteSpace(header))
-            return "(none)";
+            return NonePlaceholder;
 
         var parts = header.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 1)

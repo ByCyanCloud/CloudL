@@ -10,6 +10,16 @@
   总长超 1000 字符截断）；**响应结构不变**（统一 `ApiResponse`、snake_case 错误键、`error_id`，且日志里的 `errorId`
   与响应里的 `error_id` 是同一个值）。异常中间件自身未改动，其日志渲染结果**逐字节不变**。
 
+### 修复
+
+- **请求体为空时块状日志以换行结尾**：`[Body]` 段此前在空请求体下渲染成空串，于是消息以 `\n` 收尾
+  （`[Auth]` 与 `[Body]` 两段都空时还会多出一个空行），与契约「消息内不夹换行、空行由输出模板的 `{NewLine}` 产生」冲突。
+  现在空体（含只有空白）与缺失的 Authorization 头一样渲染为 `(none)`（沿用既有的空值写法，抽为
+  `SensitiveDataRedactor.NonePlaceholder` 常量，`ValidationFilter` 与 `ExceptionHandlingMiddleware`
+  两条路径共用，避免再次漂移），**两条路径逐字节一致**。
+  补上回归测试：两条路径都断言消息**不以 `\n` 开头、也不以 `\n` 结尾**（含空请求体这一情形）并逐字节比对。
+  其余不变（脱敏实现、`ApiResponse`/snake_case 错误键/`error_id`、30 项/1000 字符防护、`[Response]` 行字段顺序）。
+
 ### 迁移影响
 
 - **需要业务侧新增 EF 迁移：否。破坏性变更：否**（仅日志格式变化）。
