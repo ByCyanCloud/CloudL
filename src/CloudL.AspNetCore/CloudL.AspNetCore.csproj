@@ -28,4 +28,12 @@
     <ProjectReference Include="..\CloudL.Core\CloudL.Core.csproj" />
   </ItemGroup>
 
+  <!--
+    日志格式化的边界（超 30 个字段截断、超 1000 字符截断）靠 40 条 ModelState 才能精确覆盖，
+    因此把 internal 成员开放给集成测试程序集。仅 internal 可见性，不改变公开 API 面。
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="CloudL.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

@@ -59,6 +59,28 @@ public class ValidationFilterLoggingTests
     }
 
     [Fact]
+    public async Task MoreThanThirtyFailedFields_ShouldLogThirtyWithTotalCount()
+    {
+        var capture = new CapturingLoggerProvider();
+        await using var host = await CloudLTestHost.StartAsync(loggerProvider: capture);
+
+        var response = await host.Client.GetAsync("/api/validated-query/overflow");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var log = Assert.Single(CaptureValidationFailure(capture));
+
+        // 失败 40 个字段：日志只列前 30 个，并标注实际项数。
+        Assert.Equal(30, CountOccurrences(log, "字段必填"));
+        Assert.Contains("…（共 40 项）", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("…（已截断", log, StringComparison.Ordinal);
+
+        // 响应结构不变：截断只发生在日志里，errors 里 40 条一个不少。
+        var body = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
+        Assert.Equal(40, body["errors"]!.AsObject().Count);
+    }
+
+    [Fact]
     public async Task OversizedErrorDetail_ShouldBeTruncated()
     {
         var capture = new CapturingLoggerProvider();
@@ -183,6 +205,28 @@ public sealed class ManyFieldsDto
     public string? Field12 { get; set; }
 }
 
+/// <summary>
+/// 一次产生 40 条字段级错误：用于端到端验证"失败字段超过 30 个时只列前 30 个 + 标注总项数"。
+/// </summary>
+/// <remarks>
+/// 用 <see cref="IValidatableObject"/> 而不是堆 40 个 [Required] 属性：错误经由 MVC 自己的校验管道进 ModelState，
+/// 与真实请求同一条路径，但不必维护 40 个属性。
+/// </remarks>
+public sealed class OverflowFieldsDto : IValidatableObject
+{
+    /// <summary>失败字段条数，必须大于日志上限（30）。</summary>
+    public const int FailedFieldCount = 40;
+
+    /// <inheritdoc />
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        for (var index = 1; index <= FailedFieldCount; index++)
+        {
+            yield return new ValidationResult("字段必填", new[] { $"field_{index:D2}" });
+        }
+    }
+}
+
 /// <summary>单条错误消息超长：用于验证长度上限。</summary>
 public sealed class HugeMessageDto
 {
@@ -210,4 +254,7 @@ public sealed class ValidatedQueryController : ControllerBase
 
     [HttpGet("huge")]
     public ActionResult<HugeMessageDto> Huge([FromQuery] HugeMessageDto request) => Ok(request);
+
+    [HttpGet("overflow")]
+    public ActionResult<OverflowFieldsDto> Overflow([FromQuery] OverflowFieldsDto request) => Ok(request);
 }

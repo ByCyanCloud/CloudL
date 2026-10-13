@@ -78,7 +78,11 @@ public class ValidationFilter : IAsyncActionFilter
     /// 字段名与响应里的错误键一致（snake_case）；同一字段只取<strong>第一条</strong>错误。
     /// 最多列 <see cref="MaxLoggedErrorFields"/> 个字段，整体不超过 <see cref="MaxLoggedErrorsLength"/> 字符。
     /// </summary>
-    private static string FormatErrorsForLog(ModelStateDictionary modelState)
+    /// <remarks>
+    /// <c>internal</c> 仅为让测试能直接喂 <see cref="ModelStateDictionary"/> 覆盖"超上限截断"这类边界
+    /// （见 <c>CloudL.IntegrationTests</c>）；它<strong>不是</strong>对外契约，随时可改。
+    /// </remarks>
+    internal static string FormatErrorsForLog(ModelStateDictionary modelState)
     {
         var failed = modelState
             .Where(entry => entry.Value?.Errors.Count > 0)
