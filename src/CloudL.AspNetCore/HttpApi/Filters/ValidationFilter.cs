@@ -60,14 +60,22 @@ public class ValidationFilter : IAsyncActionFilter
         var requestBody = SensitiveDataRedactor.RedactBody(
             await context.HttpContext.Request.ReadBodyAsync().ConfigureAwait(false));
 
+        // 与 ExceptionHandlingMiddleware 的块状日志保持同一结构：同样的标签、同样的顺序、同样的脱敏实现。
+        // errors 本身就是统一响应体的一部分，因此并入 [Response] 那一行，而不是独占一段。
+        var authHeader = SensitiveDataRedactor.RedactAuthorizationHeader(
+            context.HttpContext.Request.Headers.Authorization.ToString());
+
         // 注意：消息字符串内不得以换行开头/结尾 —— 块状日志的空行由 Serilog 输出模板最前面的 {NewLine} 产生。
         _logger.LogWarning(
-            "请求参数验证失败\n[ErrorId={ErrorId}]\n{Method} {Path}{QueryString}\n[Errors]\n{Errors}\n[Body]\n{Body}",
+            "请求参数验证失败\n[Response]\nstatusCode={StatusCode}, errorId={ErrorId}, message={Message}, errors={Errors}\n[Request]\n{Method} {Path}{QueryString}\n[Auth]\n{AuthHeader}\n[Body]\n{Body}",
+            response.StatusCode,
             response.ErrorId,
+            response.Message,
+            FormatErrorsForLog(context.ModelState),
             context.HttpContext.Request.Method,
             context.HttpContext.Request.Path,
             context.HttpContext.Request.QueryString,
-            FormatErrorsForLog(context.ModelState),
+            authHeader,
             requestBody);
 
         context.Result = new BadRequestObjectResult(response);
@@ -77,6 +85,7 @@ public class ValidationFilter : IAsyncActionFilter
     /// 把失败字段拼成紧凑的一行供日志排查使用：<c>page_index: 页码必须大于等于 1; sort_by: 排序字段不支持</c>。
     /// 字段名与响应里的错误键一致（snake_case）；同一字段只取<strong>第一条</strong>错误。
     /// 最多列 <see cref="MaxLoggedErrorFields"/> 个字段，整体不超过 <see cref="MaxLoggedErrorsLength"/> 字符。
+    /// 结果会被拼进 <c>[Response]</c> 行的 <c>errors=</c> 之后，因此必须保持单行。
     /// </summary>
     /// <remarks>
     /// <c>internal</c> 仅为让测试能直接喂 <see cref="ModelStateDictionary"/> 覆盖"超上限截断"这类边界
@@ -135,7 +144,7 @@ public class ValidationFilter : IAsyncActionFilter
         return "参数不合法";
     }
 
-    /// <summary>把消息里的换行/制表符压成空格，保证 [Errors] 段始终是紧凑的一行。</summary>
+    /// <summary>把消息里的换行/制表符压成空格，保证 [Response] 行里的 errors 明细始终是紧凑的一行。</summary>
     private static string Flatten(string message) =>
         message.Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ').Trim();
 

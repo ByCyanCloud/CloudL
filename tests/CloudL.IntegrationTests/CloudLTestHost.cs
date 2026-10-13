@@ -106,6 +106,9 @@ internal sealed class CloudLTestHost : IAsyncDisposable
                         });
                     }
 
+                    // 与模板项目 Program.cs 一致：不缓冲请求体时，模型绑定读完后 [Body] 段永远是空的，
+                    // 验证失败日志的脱敏就无从验证。
+                    app.UseCloudLRequestBodyBuffering();
                     app.UseMiddleware<ExceptionHandlingMiddleware>();
                     app.UseRouting();
                     app.UseRateLimiter();

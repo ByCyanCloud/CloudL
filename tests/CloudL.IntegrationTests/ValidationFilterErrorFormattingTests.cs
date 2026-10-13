@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 namespace CloudL.IntegrationTests;
 
 /// <summary>
-/// 受测契约：验证失败日志 [Errors] 段的<strong>两条防护边界</strong> ——
+/// 受测契约：验证失败日志 <c>[Response]</c> 行里 errors 明细的<strong>两条防护边界</strong> ——
 /// 最多列 30 个字段（超出必须标注实际项数 <c>…（共 N 项）</c>）、总长超 1000 字符必须截断并标注。
 /// </summary>
 /// <remarks>
