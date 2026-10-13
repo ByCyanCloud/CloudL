@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace CloudL.IntegrationTests;
 
@@ -35,8 +36,13 @@ internal sealed class CloudLTestHost : IAsyncDisposable
     /// <summary>用于发起请求的客户端。</summary>
     public HttpClient Client { get; }
 
-    /// <summary>启动测试宿主；<paramref name="overrides"/> 可覆盖任意配置项。</summary>
-    public static async Task<CloudLTestHost> StartAsync(IDictionary<string, string?>? overrides = null)
+    /// <summary>
+    /// 启动测试宿主；<paramref name="overrides"/> 可覆盖任意配置项，
+    /// <paramref name="loggerProvider"/> 可挂一个捕获型 logger 用于断言日志内容。
+    /// </summary>
+    public static async Task<CloudLTestHost> StartAsync(
+        IDictionary<string, string?>? overrides = null,
+        ILoggerProvider? loggerProvider = null)
     {
         var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {
@@ -64,6 +70,11 @@ internal sealed class CloudLTestHost : IAsyncDisposable
                 webBuilder.UseTestServer();
                 webBuilder.UseEnvironment("Production");
                 webBuilder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(settings));
+
+                if (loggerProvider is not null)
+                {
+                    webBuilder.ConfigureLogging(logging => logging.AddProvider(loggerProvider));
+                }
 
                 webBuilder.ConfigureServices((context, services) =>
                 {
